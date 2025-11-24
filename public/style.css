@@ -1,0 +1,444 @@
+/* =========================
+   style.css  - Generals Pro
+   ========================= */
+
+/* --- 全局 --- */
+body {
+    background: #111;
+    color: #eee;
+    font-family: 'Verdana', sans-serif;
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* --- 顶部栏 --- */
+#ui-layer {
+    background: #222;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 2px solid #333;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    z-index: 10;
+}
+
+.top-bar-item {
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    color: #fff;
+    gap: 10px;
+}
+
+#btn-restart-game {
+    background: #c62828;
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    margin-left: 15px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+#btn-restart-game:hover { background: #d32f2f; }
+
+/* 血月指示器 */
+#blood-moon-indicator {
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid #ff5252;
+    color: #ff8a80;
+    box-shadow: 0 0 6px rgba(255, 82, 82, 0.6);
+    display: none;
+}
+#blood-moon-indicator.active {
+    display: inline-flex;
+    background: radial-gradient(circle at 30% 20%, #ff8a80 0, #b71c1c 60%, #880e4f 100%);
+}
+
+/* --- 游戏区域 --- */
+#game-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #000;
+    position: relative;
+}
+
+#grid {
+    display: grid;
+    grid-template-columns: repeat(20, 32px);
+    grid-template-rows: repeat(20, 32px);
+    gap: 1px;
+    background: #333;
+    border: 8px solid #444;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+}
+
+/* --- 单个格子 --- */
+.cell {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 900;
+    cursor: pointer;
+    user-select: none;
+    color: white;
+    position: relative;
+    text-shadow: 0 1px 2px black;
+    transition: transform 0.05s;
+}
+
+/* 基础地形 */
+.cell.unknown { background: #3f3f3f; }
+.cell.land { background: #cfd8dc; color: #333; text-shadow: none; }
+
+/* 新基础地形：海洋（ocean） */
+.cell.ocean {
+    background: #01579b;
+    background-image: radial-gradient(circle at 10% 10%, #4f89ef 0, transparent 40%),
+                      radial-gradient(circle at 70% 70%, #0288d1 0, transparent 45%);
+    color: #e1f5fe;
+}
+.cell.ocean::before {
+    font-size: 16px;
+    opacity: 0.7;
+    position: absolute;
+}
+
+/* 山脉 */
+.cell.mountain {
+    background: #546e7a;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><path d='M5 1 L9 9 L1 9 Z' fill='%23263238'/></svg>");
+    background-size: 70%;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+/* 城市 / 城堡 */
+.cell.city {
+    background: #90a4ae;
+    border-radius: 50%;
+    transform: scale(0.9);
+}
+.cell.city::after {
+    content: '👑';
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    font-size: 12px;
+}
+
+/* 将军 */
+.cell.general {
+    border: 2px solid gold;
+    z-index: 2;
+}
+.cell.general::after {
+    content: '★';
+    color: gold;
+    font-size: 18px;
+    position: absolute;
+    z-index: -1;
+}
+
+/* 沼泽 / 流沙（伤血地形） */
+.cell.swamp {
+    background: #4e342e;
+}
+.cell.swamp::before {
+    content: '≈';
+    color: rgba(255,255,255,0.3);
+    font-size: 18px;
+    position: absolute;
+}
+
+/* 墙（城墙，可破坏） */
+.cell.wall {
+    background: #5d4037;
+    border: 2px dashed #3e2723;
+    box-sizing: border-box;
+}
+
+/* 瞭望塔（增加视野） */
+.cell.tower {
+    background: #78909c;
+}
+.cell.tower::before {
+    content: '^';
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+/* 新建筑：传送门（公共不可占领） */
+.cell.portal {
+    background: radial-gradient(circle at 50% 50%, #ce93d8 0, #4a148c 55%, #12005e 100%);
+    box-shadow: 0 0 8px rgba(186, 104, 200, 0.9);
+}
+.cell.portal::before {
+    content: '⭘';
+    font-size: 18px;
+    color: #f3e5f5;
+    opacity: 0.95;
+    position: absolute;
+}
+
+/* 玩家颜色 (最高优先级 !important) */
+.owner-0 { background-color: #ef5350 !important; color: white !important; }
+.owner-1 { background-color: #ffcc00 !important; color: white !important; }
+.owner-2 { background-color: #66bb6a !important; color: white !important; }
+.owner-3 { background-color: #ab47bc !important; color: white !important; }
+.owner-4 { background-color: #71ffd7 !important; color: white !important; }
+.owner-5 { background-color: #e700fc !important; color: white !important; }
+
+/* 选中格子 */
+.cell.selected {
+    box-shadow: inset 0 0 0 3px #fffde7;
+    z-index: 10;
+}
+
+/* 迷雾效果 */
+.cell.fog {
+    opacity: 0.4;
+    filter: grayscale(50%);
+}
+
+/* 迷雾中的特殊建筑仍可辨认 */
+.cell.fog.city      { background: #555 !important; color: #ddd !important; }
+.cell.fog.mountain  { background: #333 !important; }
+.cell.fog.wall      { background: #3e2723 !important; }
+.cell.fog.tower     { background: #455a64 !important; }
+.cell.fog.portal    { background: #311b92 !important; box-shadow: 0 0 4px rgba(149,117,205,0.7); }
+.cell.fog.unknown   { background: #080808 !important; }
+
+/* --- 大厅 UI --- */
+#lobby-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    backdrop-filter: blur(3px);
+}
+
+.lobby-card {
+    background: #212121;
+    width: 720px;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    padding: 30px;
+    border: 1px solid #333;
+    color: #eee;
+}
+
+.lobby-header {
+    text-align: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+}
+.lobby-header h1 {
+    margin: 0;
+    font-size: 28px;
+    color: #fff;
+}
+
+/* 登录部分 */
+#auth-section {
+    text-align: center;
+    padding: 20px;
+}
+.input-group {
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+.input-group input {
+    padding: 10px;
+    background: #333;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 4px;
+    width: 180px;
+    text-align: center;
+    outline: none;
+}
+.input-group input:focus { border-color: #1976d2; }
+.btn-group {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* 房间布局：左右分栏 */
+.lobby-content {
+    display: flex;
+    gap: 30px;
+}
+.col-left { flex: 1; }
+.col-right {
+    flex: 1;
+    background: #2a2a2a;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #333;
+}
+
+/* 面板标题 */
+.panel-title {
+    margin-top: 0;
+    color: #aaa;
+    font-size: 14px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+/* 玩家列表项 */
+#player-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+#player-list li {
+    background: #333;
+    margin-bottom: 8px;
+    padding: 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid transparent;
+}
+.p-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: bold;
+}
+.p-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.status-badge {
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-weight: bold;
+    color: #111;
+    width: 70px;
+    text-align: center;
+}
+.status-badge.ready { background: #66bb6a; }
+.status-badge.wait  { background: #bdbdbd; }
+
+/* 血月状态徽标（可用于列表等） */
+.status-badge.blood-moon {
+    background: #ff5252;
+    color: #fff;
+    box-shadow: 0 0 6px rgba(255,82,82,0.8);
+}
+
+.kick-btn {
+    color: #ef5350;
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 16px;
+}
+.kick-btn:hover { color: red; }
+
+/* 设置项 */
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+.setting-row input,
+.setting-row select {
+    background: #111;
+    border: 1px solid #444;
+    color: #ddd;
+    padding: 5px;
+    border-radius: 4px;
+    width: 110px;
+}
+.setting-row .setting-note {
+    font-size: 11px;
+    color: #888;
+    margin-left: 4px;
+}
+
+/* 底部按钮区 */
+.lobby-footer {
+    margin-top: 30px;
+    text-align: center;
+    border-top: 1px solid #333;
+    padding-top: 20px;
+}
+button.action-btn {
+    padding: 12px 40px;
+    font-size: 18px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.1s;
+    color: white;
+}
+button.btn-primary { background: #1976d2; }
+button.btn-ready   { background: #fbc02d; color: #222; }
+button.btn-cancel  { background: #ef5350; color: white; }
+button:active      { transform: scale(0.98); }
+
+/* --- 计分板 --- */
+#leaderboard {
+    pointer-events: none;
+}
+
+/* 胜利提示 Toast */
+.game-over-toast {
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #ffd700, #ffa000);
+    color: #000;
+    padding: 25px 60px;
+    font-size: 32px;
+    font-weight: 900;
+    border-radius: 50px;
+    box-shadow: 0 10px 50px rgba(255, 215, 0, 0.6);
+    z-index: 9999;
+    text-transform: uppercase;
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 4px solid #fff;
+    cursor: pointer;
+    text-align: center;
+}
+@keyframes popIn {
+    from { transform: translateX(-50%) scale(0); }
+    to   { transform: translateX(-50%) scale(1); }
+}
