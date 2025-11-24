@@ -65,10 +65,16 @@ function dbRun(sql, params = []) {
 // ==========================================
 // 游戏逻辑类
 // ==========================================
-
 const MAP_W = 20, MAP_H = 20;
 const SIZE  = MAP_W * MAP_H;
-const COLORS = ['#ef5350', '#42a5f5', '#66bb6a', '#ab47bc', '#ffa726', '#26c6da'];
+const COLORS = [
+    '#ef5350',
+    '#ffcc00',
+    '#66bb6a',
+    '#ab47bc',
+    '#42a5f5',
+    '#71ffd7'
+];
 
 class Game {
     constructor(id) {
@@ -161,10 +167,14 @@ class Game {
         if (idx !== -1) {
             const wasHost = this.players[idx].isHost;
             this.players.splice(idx, 1);
-            this.players.forEach((p, i) => p.index = i);
-            this.lastViews.delete(socketId);
             
-            // 如果房主退出，移交房主权限给第一位玩家
+            // 重新计算所有人的 index 和 color
+            this.players.forEach((p, i) => {
+                p.index = i;
+                p.color = COLORS[i]; // <--- 颜色随位置自动更新
+            });
+
+            this.lastViews.delete(socketId);
             if (wasHost && this.players.length > 0) {
                 this.players[0].isHost = true;
             }

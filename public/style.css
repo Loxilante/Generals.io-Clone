@@ -132,7 +132,7 @@ body {
     transform: scale(0.9);
 }
 .cell.city::after {
-    content: '👑';
+    content: none;
     position: absolute;
     top: -6px;
     right: -4px;
@@ -198,8 +198,8 @@ body {
 .owner-1 { background-color: #ffcc00 !important; color: white !important; }
 .owner-2 { background-color: #66bb6a !important; color: white !important; }
 .owner-3 { background-color: #ab47bc !important; color: white !important; }
-.owner-4 { background-color: #71ffd7 !important; color: white !important; }
-.owner-5 { background-color: #e700fc !important; color: white !important; }
+.owner-4 { background-color: #42a5f5 !important; color: white !important; }
+.owner-5 { background-color: #71ffd7 !important; color: white !important; }
 
 /* 选中格子 */
 .cell.selected {
