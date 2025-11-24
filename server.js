@@ -742,13 +742,14 @@ class Game {
             if (owner === -1) continue;
 
             const type = this.types[i];
-            const range = (type === 'tower') ? 5 : 1;
+            const range = (type === 'tower') ? 2 : 1;
             const y = Math.floor(i / MAP_W);
             const x = i % MAP_W;
             const base = owner * SIZE;
 
             for (let dy = -range; dy <= range; dy++) {
                 for (let dx = -range; dx <= range; dx++) {
+                    if (Math.abs(dx) + Math.abs(dy) > range) continue; // 改为菱形视野
                     const nx = x + dx, ny = y + dy;
                     if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
                     const ni = ny * MAP_W + nx;
