@@ -4,6 +4,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const sqlite3 = require('sqlite3').verbose(); // 启用详细模式以便于调试数据库错误
 
 const app = express();
 const server = http.createServer(app);
@@ -14,16 +15,65 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ==========================================
+// 数据库初始化 (SQLite)
+// ==========================================
+
+// 连接到本地文件数据库 game.db
+// 如果文件不存在，sqlite3 会自动创建
+const db = new sqlite3.Database('./game.db', (err) => {
+    if (err) {
+        console.error('Database connection error:', err.message);
+    } else {
+        console.log('Connected to the SQLite database.');
+    }
+});
+
+// 初始化用户表结构
+// 包含字段: username (主键), password, wins (胜场), games (总场次)
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY,
+        password TEXT,
+        wins INTEGER DEFAULT 0,
+        games INTEGER DEFAULT 0
+    )`);
+});
+
+// 封装数据库查询方法 (Promise wrapper for db.get)
+// 用于查询单条记录
+function dbGet(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
+    });
+}
+
+// 封装数据库执行方法 (Promise wrapper for db.run)
+// 用于执行 INSERT, UPDATE, DELETE 操作
+function dbRun(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function(err) {
+            if (err) reject(err);
+            else resolve(this); // 返回上下文，包含 lastID 和 changes
+        });
+    });
+}
+
+// ==========================================
+// 游戏逻辑类
+// ==========================================
+
 const MAP_W = 20, MAP_H = 20;
 const SIZE  = MAP_W * MAP_H;
 const COLORS = ['#ef5350', '#42a5f5', '#66bb6a', '#ab47bc', '#ffa726', '#26c6da'];
 
-const users = new Map();
-
 class Game {
     constructor(id) {
         this.id = id;
-        this.players = [];  // {socketId, account, name, dead, isReady, isHost, color, index}
+        this.players = [];  // 存储玩家信息对象
 
         this.types  = new Array(SIZE).fill('land');
         this.armies = new Int32Array(SIZE).fill(0);
@@ -50,7 +100,7 @@ class Game {
             growthLambda: 1
         };
 
-        this.lastViews = new Map();     // socketId -> { armies, owners, types, fogs, initialized }
+        this.lastViews = new Map();     // socketId -> 玩家视图缓存
         this.vis = null;
         this.portalCells = [];
         this.bloodMoonActive = false;
@@ -81,6 +131,8 @@ class Game {
 
     addPlayer(socketId, username, nickname) {
         if (this.players.length >= 6) return { success: false, msg: '房间满员' };
+        
+        // 检查当前房间内是否已有相同账号登录
         if (this.players.find(p => p.account === username)) {
             return { success: false, msg: '该账号已在房间中' };
         }
@@ -98,6 +150,8 @@ class Game {
             color: COLORS[this.players.length],
             index: this.players.length
         });
+        
+        // 重置索引以确保连续性
         this.players.forEach((p, i) => p.index = i);
         return { success: true };
     }
@@ -109,6 +163,8 @@ class Game {
             this.players.splice(idx, 1);
             this.players.forEach((p, i) => p.index = i);
             this.lastViews.delete(socketId);
+            
+            // 如果房主退出，移交房主权限给第一位玩家
             if (wasHost && this.players.length > 0) {
                 this.players[0].isHost = true;
             }
@@ -154,9 +210,11 @@ class Game {
         if (this.players.length < 2) return;
 
         let ok = false;
+        // 尝试生成有效地图，最多重试 50 次
         for (let i = 0; i < 50; i++) {
             if (this.generateMap(false)) { ok = true; break; }
         }
+        // 如果依然失败，强制生成（可能忽略部分限制）
         if (!ok) this.generateMap(true);
 
         this.status = 'playing';
@@ -179,7 +237,7 @@ class Game {
         this.owners.fill(-1);
         this.portalCells = [];
 
-        // 1) 山 / 沼泽 / 墙
+        // 1. 生成基础地形 (山脉、沼泽、墙)
         for (let i = 0; i < SIZE; i++) {
             let r = Math.random();
             if (r < 0.18) {
@@ -193,37 +251,30 @@ class Game {
             }
         }
 
-        // 2) 海洋 - 连片生成
+        // 2. 生成海洋 - 使用 BFS 生成连片区域
         const oceanRatio = Math.max(0, Math.min(1, Number(this.settings.oceanRatio) || 0));
         if (oceanRatio > 0) {
-            const desired = Math.floor(SIZE * oceanRatio);    // 想要的海洋格子总数
+            const desired = Math.floor(SIZE * oceanRatio);
             if (desired > 0) {
                 let oceanCount = 0;
                 let blobTries  = 0;
-            
-                const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-            
-                // 每一片海洋的平均大小，可以根据地图大小 / 口味调
-                const avgBlobSize = 25;                 // 每片海大概 25 格
+                const avgBlobSize = 25;
                 const maxBlobs    = Math.max(1, Math.floor(desired / avgBlobSize));
             
                 while (oceanCount < desired && blobTries < maxBlobs * 5) {
                     blobTries++;
-                
-                    // 随机找一个种子
                     let seed = -1;
+                    // 寻找随机种子点
                     for (let k = 0; k < 200; k++) {
                         const i = Math.floor(Math.random() * SIZE);
-                        if (this.types[i] === 'land') { // 只在平地上生成海
+                        if (this.types[i] === 'land') {
                             seed = i;
                             break;
                         }
                     }
                     if (seed === -1) break;
                 
-                    // 这一片海期望大小 [avgBlobSize/2, avgBlobSize*3/2]
                     const blobTarget = avgBlobSize / 2 + Math.floor(Math.random() * avgBlobSize);
-                
                     const q = [seed];
                     const used = new Set([seed]);
                 
@@ -252,8 +303,7 @@ class Game {
             }
         }
 
-
-        // 3) 城市 / 塔
+        // 3. 生成城市与塔
         for (let i = 0; i < SIZE; i++) {
             const t = this.types[i];
             if (t === 'mountain' || t === 'wall') continue;
@@ -267,7 +317,7 @@ class Game {
             }
         }
 
-        // 4) generals
+        // 4. 生成玩家将军 (起始点)
         const starts = [];
         const minDist = Number(this.settings.minDist) || 16;
 
@@ -278,8 +328,10 @@ class Game {
                 const y = Math.floor(Math.random() * MAP_H);
                 const ii = idx(x, y);
                 const t = this.types[ii];
+                // 确保起始点不在障碍物或特殊建筑上
                 if (t === 'mountain' || t === 'wall' || t === 'city' || t === 'tower') continue;
 
+                // 检查与其他将军的距离
                 let okDist = true;
                 for (const s of starts) {
                     if (Math.abs(x - s.x) + Math.abs(y - s.y) < minDist && !force) {
@@ -299,7 +351,8 @@ class Game {
             if (!placed && !force) return false;
         }
 
-        // 5) 连通性（只看 mountain+wall）
+        // 5. 连通性检查 (BFS)
+        // 确保所有将军之间可以通过非障碍物路径互达
         if (starts.length > 0 && !force) {
             const walkable = (i) => {
                 const t = this.types[i];
@@ -336,7 +389,7 @@ class Game {
             if (!allConn) return false;
         }
 
-        // 6) 传送门
+        // 6. 生成传送门
         const portalCount = Math.max(0, Math.floor(Number(this.settings.portalCount) || 0));
         let tries = 0;
         while (this.portalCells.length < portalCount && tries < 2000) {
@@ -357,6 +410,7 @@ class Game {
     tick() {
         this.turn++;
 
+        // 处理血月逻辑
         const bloodTurn = Number(this.settings.bloodMoonTurn) || 0;
         if (!this.bloodMoonActive && bloodTurn > 0 && this.turn >= bloodTurn) {
             this.bloodMoonActive = true;
@@ -369,6 +423,7 @@ class Game {
 
             const type = this.types[i];
 
+            // 沼泽扣血
             if (type === 'swamp' && this.armies[i] > 0) {
                 this.armies[i]--;
                 if (this.armies[i] <= 0) {
@@ -380,11 +435,13 @@ class Game {
 
             if (this.owners[i] === -1) continue;
 
+            // 城市与将军每回合自动增长
             if (type === 'general' || type === 'city') {
                 this.armies[i]++;
                 continue;
             }
 
+            // 海洋增长逻辑
             if (type === 'ocean') {
                 if (this.turn % 40 === 0) {
                     this.armies[i] += 2;
@@ -392,6 +449,7 @@ class Game {
                 continue;
             }
 
+            // 普通地形周期性增长
             if (type !== 'swamp' && type !== 'mountain') {
                 if (this.turn % (Number(this.settings.growthPeriod) || 25) === 0) {
                     if (this.settings.growthMode === 'fixed') {
@@ -435,12 +493,14 @@ class Game {
 
             const ti = candidates[Math.floor(Math.random() * candidates.length)];
 
+            // 扣除源头兵力
             this.armies[fi] -= amt;
             if (this.armies[fi] <= 0) {
                 this.armies[fi] = 0;
                 this.owners[fi] = -1;
             }
 
+            // 移动到目标传送门
             this.applyMoveToCell(pid, amt, ti);
         }
     }
@@ -454,6 +514,7 @@ class Game {
 
         if (tType === 'mountain') return;
 
+        // 如果是己方领土，直接合并
         if (tOwner === pid) {
             this.armies[ti] = tArmy + amt;
             return;
@@ -462,6 +523,7 @@ class Game {
         const captureThreshold = Math.max(0, Number(this.settings.captureThreshold) || 0);
         const isBuilding = (tType === 'general' || tType === 'city' || tType === 'tower' || tType === 'wall');
 
+        // 处理中立墙体逻辑
         if (tType === 'wall' && tOwner === -1) {
             if (amt > tArmy) {
                 const rem = amt - tArmy;
@@ -469,7 +531,7 @@ class Game {
                     this.armies[ti] = Math.max(1, tArmy - amt);
                     return;
                 }
-                this.types[ti] = 'land';
+                this.types[ti] = 'land'; // 墙被破坏变成平地
                 this.owners[ti] = pid;
                 this.armies[ti] = rem;
             } else {
@@ -482,6 +544,7 @@ class Game {
             return;
         }
 
+        // 攻击敌方或中立建筑
         if (amt > tArmy) {
             const rem = amt - tArmy;
 
@@ -490,9 +553,10 @@ class Game {
                 return;
             }
 
+            // 击杀将军
             if (tType === 'general' && tOwner !== -1) {
                 this.handleDeath(tOwner, pid);
-                this.types[ti] = 'city';
+                this.types[ti] = 'city'; // 将军死亡后变成城市
             }
 
             this.owners[ti] = pid;
@@ -522,6 +586,7 @@ class Game {
         if (rawAmt <= 0) return;
 
         let amt = rawAmt;
+        // 海洋出发有兵力衰减
         if (fromType === 'ocean' && toType !== 'ocean' && toType !== 'mountain') {
             amt = Math.floor(amt * 0.9);
             if (amt <= 0) return;
@@ -549,6 +614,7 @@ class Game {
         if (!p || p.dead) return;
 
         let isDead = true;
+        // 城堡模式下，还有城市即未死亡
         if (this.settings.gameMode === 'castle') {
             for (let i = 0; i < SIZE; i++) {
                 if (this.owners[i] === victimIdx && this.types[i] === 'city') {
@@ -560,6 +626,7 @@ class Game {
 
         if (isDead) {
             p.dead = true;
+            // 将死者的领地转交给击杀者，兵力减半
             for (let i = 0; i < SIZE; i++) {
                 if (this.owners[i] === victimIdx) {
                     this.owners[i] = killerIdx;
@@ -579,17 +646,18 @@ class Game {
 
         io.to(this.id).emit('game_over', winnerIdx);
 
-        // 战绩写回内存 users
-        if (winnerIdx !== -1) {
-            const winner = this.players[winnerIdx];
-            if (winner) {
-                const u = users.get(winner.account);
-                if (u) u.wins++;
-            }
-        }
+        // 异步更新数据库战绩
+        // 注意：此处不使用 await 阻塞，避免影响房间重置流程
         this.players.forEach(p => {
-            const u = users.get(p.account);
-            if (u) u.games++;
+            // 1. 所有人增加总场次
+            dbRun('UPDATE users SET games = games + 1 WHERE username = ?', [p.account])
+                .catch(err => console.error(`Error updating games for ${p.account}:`, err.message));
+
+            // 2. 赢家增加胜场
+            if (winnerIdx !== -1 && p.index === winnerIdx) {
+                dbRun('UPDATE users SET wins = wins + 1 WHERE username = ?', [p.account])
+                    .catch(err => console.error(`Error updating wins for ${p.account}:`, err.message));
+            }
         });
 
         setTimeout(() => this.resetRoom(), 5000);
@@ -629,7 +697,7 @@ class Game {
 
     updateSettings(s) {
         const ns = { ...s };
-
+        // 校验设置参数边界
         if (ns.speed != null) ns.speed = Math.max(0.1, Number(ns.speed) || 0.5);
         if (ns.minDist != null) ns.minDist = Math.max(4, Number(ns.minDist) || 16);
         if (ns.captureThreshold != null) ns.captureThreshold = Math.max(0, Number(ns.captureThreshold) || 0);
@@ -652,7 +720,7 @@ class Game {
         const pCount = this.players.length;
         if (pCount === 0) return;
 
-        // ---------- 1. 计算视野 ----------
+        // 1. 计算全局视野 (Optimization: 复用 Int8Array 减少 GC)
         if (!this.vis || this.vis.length !== SIZE * pCount) {
             this.vis = new Int8Array(SIZE * pCount);
         }
@@ -671,9 +739,6 @@ class Game {
 
             for (let dy = -range; dy <= range; dy++) {
                 for (let dx = -range; dx <= range; dx++) {
-                    // ✅ 视野改成“菱形”，跟 4 向移动一致
-                    // if (Math.abs(dx) + Math.abs(dy) > range) continue;
-
                     const nx = x + dx, ny = y + dy;
                     if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
                     const ni = ny * MAP_W + nx;
@@ -684,7 +749,7 @@ class Game {
 
         const scores = this.getScores();
 
-        // ---------- 2. 给每个玩家打包可见 & 迷雾信息 ----------
+        // 2. 为每个玩家计算可见性与迷雾
         this.players.forEach(p => {
             const offset = p.index * SIZE;
             let view = this.lastViews.get(p.socketId);
@@ -708,28 +773,22 @@ class Game {
                 let a, o, t, f;
 
                 if (p.dead || vis[offset + i] === 1) {
-                    // ✅ 我能看到：发真实信息
+                    // 可见区域：同步真实数据
                     a = this.armies[i];
                     o = this.owners[i];
                     t = realType;
                     f = 0;
                 } else {
-                    // ✅ 迷雾：隐藏数值和归属，但“有建筑/障碍”要保留
+                    // 迷雾区域：隐藏数据
                     a = 0;
                     o = -1;
                     f = 1;
 
-                    if (
-                        realType === 'mountain' ||
-                        realType === 'city'     ||
-                        realType === 'wall'     ||
-                        realType === 'tower'    ||
-                        realType === 'portal'   ||
-                        realType === 'general'  // 敌方将军
-                    ) {
-                        t = realType;          // 建筑/障碍 -> 真实类型
+                    // 特殊建筑在迷雾中依然保留类型标识
+                    if (['mountain', 'city', 'wall', 'tower', 'portal', 'general'].includes(realType)) {
+                        t = realType;
                     } else {
-                        t = 'unknown';         // land / ocean / swamp 等 -> 统一 unknown
+                        t = 'unknown';
                     }
                 }
 
@@ -749,7 +808,6 @@ class Game {
                     }
                 }
 
-                // 更新缓存
                 view.armies[i] = a;
                 view.owners[i] = o;
                 view.types[i]  = t;
@@ -758,7 +816,6 @@ class Game {
 
             view.initialized = true;
 
-            // ---------- 3. 下发 full / changes ----------
             const payload = {
                 turn: this.turn,
                 scores,
@@ -772,51 +829,70 @@ class Game {
                 payload.owners = ownersFull;
                 payload.types  = typesFull;
                 payload.fogs   = fogsFull;
-            
-                // ★ 首次完整同步，用可靠通道发送
+                
                 io.to(p.socketId).compress(false).emit('game_tick', payload);
             } else {
                 payload.changes = changes;
-            
-                // ★ 后续增量更新可以继续用 volatile（节省一点）
                 io.to(p.socketId).volatile.compress(false).emit('game_tick', payload);
             }
         });
     }
-
 }
 
 const game = new Game('global');
 
-// ========== Socket.io 事件 ==========
+// ==========================================
+// Socket.io 事件处理
+// ==========================================
 io.on('connection', (socket) => {
-    // 注册 - 用内存 Map 保存
-    socket.on('register', ({ username, password }) => {
+    
+    // 注册接口：写入 SQLite 数据库
+    socket.on('register', async ({ username, password }) => {
         if (!username || !password) {
             return socket.emit('msg', { type: 'error', text: '请输入账号密码' });
         }
-        if (users.has(username)) {
-            return socket.emit('msg', { type: 'error', text: '注册失败: 用户名已存在(内存)' });
+        
+        try {
+            // 注意：生产环境应使用 bcrypt 对密码进行哈希处理，此处为演示直接存储
+            await dbRun('INSERT INTO users (username, password) VALUES (?, ?)', [username, password]);
+            socket.emit('msg', { type: 'success', text: '注册成功，请登录' });
+        } catch (err) {
+            if (err.message.includes('UNIQUE constraint failed')) {
+                socket.emit('msg', { type: 'error', text: '用户名已存在' });
+            } else {
+                console.error('Register Error:', err);
+                socket.emit('msg', { type: 'error', text: '注册失败：服务器内部错误' });
+            }
         }
-        users.set(username, { password, wins: 0, games: 0 });
-        socket.emit('msg', { type: 'success', text: '注册成功，请登录（数据仅保存在内存）' });
     });
 
-    // 登录 - 直接查内存 Map
-    socket.on('login', ({ username, password }) => {
+    // 登录接口：查询 SQLite 数据库
+    socket.on('login', async ({ username, password }) => {
         if (!username || !password) {
             return socket.emit('msg', { type: 'error', text: '请输入账号密码' });
         }
-        const u = users.get(username);
-        if (!u || u.password !== password) {
-            return socket.emit('msg', { type: 'error', text: '登录失败: 账号或密码错误（内存）' });
+        
+        try {
+            const row = await dbGet('SELECT * FROM users WHERE username = ?', [username]);
+            
+            if (!row) {
+                return socket.emit('msg', { type: 'error', text: '用户不存在' });
+            }
+            if (row.password !== password) {
+                return socket.emit('msg', { type: 'error', text: '密码错误' });
+            }
+
+            socket.data.username = username;
+            socket.emit('login_success', { username, wins: row.wins });
+            socket.emit('msg', { type: 'success', text: `欢迎回来, ${username}` });
+            
+        } catch (err) {
+            console.error('Login Error:', err);
+            socket.emit('msg', { type: 'error', text: '登录失败：数据库错误' });
         }
-        socket.data.username = username;
-        socket.emit('login_success', { username, wins: u.wins });
-        socket.emit('msg', { type: 'success', text: `欢迎, ${username}` });
     });
 
-    // 加入游戏
+    // 加入游戏：基于 socket.data.username
     socket.on('join', (data = {}) => {
         if (!socket.data.username) {
             return socket.emit('msg', { type: 'error', text: '请先登录' });
@@ -873,5 +949,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(11452, () => {
-    console.log('🚀 Generals Pro Server Ready: 11452');
+    console.log('🚀 Generals Pro Server Ready: 11452 (Database: On)');
 });
