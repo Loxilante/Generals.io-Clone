@@ -242,32 +242,65 @@
             const st = cellState[idx];
             const el = cellCache[idx];
             if (!el || !st) return;
+            
+            // 提取状态
+            let { type, owner, fog, army, sel } = st;
+
+            // 1. 生成 Class 列表
+            let classes = ['cell'];
+
+            if (fog) {
+                // === 迷雾模式 ===
+                classes.push('fog');
+
+                // 在迷雾里，不加具体类型类名
+                // 障碍物:'fog-obstacle'
+                const obstacles = ['mountain', 'city', 'wall', 'tower', 'portal', 'general'];
                 
-            const type = st.type;
-            const owner = st.owner;
-            const fog = st.fog;
-            const army = st.army;
-                
-            let cls = 'cell';
-                
-            if (!fog) {
-                // ★ 只有在“看得见”的时候，才根据类型/阵营加样式
-                if (type && type !== 'land') cls += ' ' + type;
-                if (owner !== -1) cls += ' owner-' + owner;
+                // 注意：服务端发来的数据里，General 可能已经被伪装成 City 了，
+                // 但不管它是啥，只要是障碍物，统统变成 'fog-obstacle'
+                if (obstacles.includes(type)) {
+                    classes.push('fog-obstacle');
+                } else {
+                    // 剩下的就是平地/沼泽/未知
+                    if (type === 'unknown') classes.push('unknown');
+                    // 平地在迷雾里不加任何特殊类，就用默认 fog 样式
+                }
+
+                if (owner !== -1) {
+                     // classes.push('owner-' + owner); // 如果想让迷雾里也能看到己方颜色
+                }
+
             } else {
-                // ★ 迷雾状态：不加类型、不加 owner 颜色
-                //    这样就不会暴露具体是山/城/塔/将军
+                // === 可见模式 (保持原样) ===
+                if (type !== 'unknown') {
+                    if (type === 'land') {
+                        // 如果是平地：没人占的时候才加 'land' 类
+                        if (owner === -1) {
+                            classes.push('land');
+                        }
+                    } else {
+                        // 其他正常添加
+                        classes.push(type);
+                    }
+                }
+
+                if (owner !== -1) {
+                    classes.push('owner-' + owner);
+                }
             }
-        
-            if (fog) cls += ' fog';
-            if (st.sel) cls += ' selected';
-            el.className = cls;
-        
+
+            // 选中状态
+            if (sel) classes.push('selected');
+
+            el.className = classes.join(' ');
+
+            // 2. 内容渲染
             let txt = '';
             el.style.fontSize = '';
-        
+
             if (!fog) {
-                // 可见：显示真实兵力
+                // 可见时
                 if (type === 'wall' && owner === -1) {
                     txt = army;
                     el.style.fontSize = '10px';
@@ -275,16 +308,10 @@
                     txt = army;
                 }
             } else {
-                // 迷雾：只标识“这里有特别的东西”，但不区分具体类型
-                if (['city','general','wall','tower','portal','mountain'].includes(type)) {
-                    txt = '?';
-                }
+                // 不显示文字
             }
-        
+
             el.innerText = txt;
-        
-            // 调试用：
-            // el.title = `${type} / owner=${owner} / fog=${fog} / army=${army}`;
         }
 
 

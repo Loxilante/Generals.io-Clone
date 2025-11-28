@@ -94,16 +94,53 @@ body {
     cursor: pointer;
     user-select: none;
     color: white;
+    background: #222;
     position: relative;
     text-shadow: 0 1px 2px black;
     transition: transform 0.05s;
 }
 
-/* 基础地形 */
-.cell.unknown { background: #3f3f3f; }
-.cell.land { background: #cfd8dc; color: #333; text-shadow: none; }
+/* 平地 */
+.cell.land {
+    background: #cfd8dce3; /* 浅灰偏蓝 */
+    color: #333;
+    text-shadow: none;
+}
 
-/* 新基础地形：海洋（ocean） */
+/* 迷雾 */
+.cell.fog {
+    background: #222 !important; /* 深黑灰色，表示迷雾底色 */
+    border: 1px solid #333 !important;
+    border-radius: 0 !important; /* 强制直角 */
+    opacity: 1;
+    filter: none;
+}
+
+.cell.fog:not(.selected) {
+    box-shadow: none !important;
+}
+
+.cell.fog.land {
+    background: #222 !important;
+    color: transparent;
+}
+
+/* 迷雾里的障碍物 */
+.cell.fog.fog-obstacle {
+    background: #4a4a4a !important; /* 比底色稍微亮一点的灰色 */
+    border: 1px solid #555 !important;
+    border-radius: 0 !important; /* 强制方块 */
+    background-image: none !important; /* 去掉图片 */
+    transform: none !important; /* 去掉缩放 */
+}
+
+/* 未知 */
+.cell.unknown {
+    background: #000 !important; /* 纯黑 */
+    border-color: #111;
+}
+
+/* 海洋 */
 .cell.ocean {
     background: #01579b;
     background-image: radial-gradient(circle at 10% 10%, #4f89ef 0, transparent 40%),
@@ -145,7 +182,7 @@ body {
     z-index: 2;
 }
 .cell.general::after {
-    content: '★';
+    content: '★' !important;
     color: gold;
     font-size: 18px;
     position: absolute;
@@ -194,17 +231,18 @@ body {
 }
 
 /* 玩家颜色 (最高优先级 !important) */
-.owner-0 { background-color: #ef5350 !important; color: white !important; }
-.owner-1 { background-color: #ffcc00 !important; color: white !important; }
-.owner-2 { background-color: #66bb6a !important; color: white !important; }
-.owner-3 { background-color: #ab47bc !important; color: white !important; }
-.owner-4 { background-color: #42a5f5 !important; color: white !important; }
-.owner-5 { background-color: #71ffd7 !important; color: white !important; }
+.owner-0 { background-color: #ef5350 !important; text-shadow: 0 1px 2px black !important; color: white !important; }
+.owner-1 { background-color: #ffcc00 !important; text-shadow: 0 1px 2px black !important; color: white !important; }
+.owner-2 { background-color: #66bb6a !important; text-shadow: 0 1px 2px black !important; color: white !important; }
+.owner-3 { background-color: #ab47bc !important; text-shadow: 0 1px 2px black !important; color: white !important; }
+.owner-4 { background-color: #f542aa !important; text-shadow: 0 1px 2px black !important; color: white !important; }
+.owner-5 { background-color: #71ffd7 !important; text-shadow: 0 1px 2px black !important; color: white !important; }
 
 /* 选中格子 */
-.cell.selected {
-    box-shadow: inset 0 0 0 3px #fffde7;
-    z-index: 10;
+.cell.selected,
+.cell.fog.selected {
+    box-shadow: inset 0 0 0 3px #fffde7 !important;
+    z-index: 999 !important;
 }
 
 /* 迷雾效果 */

@@ -796,6 +796,10 @@ class Game {
                     f = 1;
 
                     // 特殊建筑在迷雾中依然保留类型标识
+                    if (realType === 'general') {
+                        // 不传输将军
+                        t = 'city';
+                    }
                     if (['mountain', 'city', 'wall', 'tower', 'portal', 'general'].includes(realType)) {
                         t = realType;
                     } else {
