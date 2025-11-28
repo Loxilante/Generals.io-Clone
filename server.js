@@ -749,7 +749,7 @@ class Game {
 
             for (let dy = -range; dy <= range; dy++) {
                 for (let dx = -range; dx <= range; dx++) {
-                    if (Math.abs(dx) + Math.abs(dy) > range) continue; // 改为菱形视野
+                    // if (Math.abs(dx) + Math.abs(dy) > range) continue; // 不采用菱形视野
                     const nx = x + dx, ny = y + dy;
                     if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
                     const ni = ny * MAP_W + nx;
@@ -844,7 +844,7 @@ class Game {
                 io.to(p.socketId).compress(false).emit('game_tick', payload);
             } else {
                 payload.changes = changes;
-                io.to(p.socketId).volatile.compress(false).emit('game_tick', payload);
+                io.to(p.socketId).compress(false).emit('game_tick', payload);
             }
         });
     }
@@ -960,5 +960,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(11452, () => {
-    console.log('🚀 Generals Pro Server Ready: 11452 (Database: On)');
+    console.log('Generals Pro Server Ready: 11452');
 });

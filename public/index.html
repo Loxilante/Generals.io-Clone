@@ -225,6 +225,7 @@
         let isHost = false;
         let isInLobby = true;
         let isHalf = false;
+        let myIndex = -1; // 记录自己的玩家索引
         let lastBoardHtml = '';
 
         function makeDefaultCellState() {
@@ -376,7 +377,15 @@
             if (isInLobby) ui.overlay.style.display = 'flex';
 
             const me = players.find(p => p.id === socket.id);
-            if (me) isHost = me.isHost;
+            // if (me) isHost = me.isHost;
+            if (me) {
+                myIndex = me.index; // 赋值全局变量
+                isHost = me.isHost;
+                
+                // 更新按钮状态
+                ui.btnReady.innerText = me.isReady ? '取消' : '准备';
+                ui.btnReady.className = `action-btn ${me.isReady ? 'btn-cancel' : 'btn-ready'}`;
+            }
 
             ui.pList.innerHTML = players.map(p => `
                 <li style="border-left-color:${p.color}">
@@ -450,6 +459,10 @@
         // ==== 只增量同步变化格子：full + changes ====
         socket.on('game_tick', (data) => {
             // if (isInLobby) return;
+            if (typeof data.me === 'number') {
+                myIndex = data.me;
+            }
+
             document.getElementById('turn-count').innerText = data.turn;
 
             // 血月指示
@@ -496,6 +509,76 @@
                 }
             }
         });
+
+        // ===== 客户端预测逻辑 =====
+        function predictLocalMove(from, to, half) {
+            if (myIndex < 0) return;
+
+            const fi = from.y * MAP_W + from.x;
+            const ti = to.y * MAP_W + to.x;
+            if (fi < 0 || fi >= SIZE || ti < 0 || ti >= SIZE) return;
+
+            const fromCell = cellState[fi];
+            const toCell = cellState[ti];
+            if (!fromCell || !toCell) return;
+
+            // 基础校验
+            if (fromCell.owner !== myIndex) return;
+            if (fromCell.army <= 1) return;
+            if (fromCell.type === 'mountain') return;
+            if (toCell.type === 'mountain') return;
+
+            // 计算兵力
+            let rawAmt = half ? Math.floor(fromCell.army / 2) : (fromCell.army - 1);
+            if (rawAmt <= 0) return;
+
+            let amt = rawAmt;
+            const fromType = fromCell.type;
+            const toType = toCell.type;
+
+            // 海洋衰减模拟
+            if (fromType === 'ocean' && toType !== 'ocean' && toType !== 'mountain') {
+                amt = Math.floor(amt * 0.9);
+                if (amt <= 0) return;
+            }
+
+            // 占领阈值检查
+            const capVal = ui.sCapThr ? (Number(ui.sCapThr.value) || 0) : 0;
+            const isBuildingTarget = (toType === 'general' || toType === 'city' || toType === 'tower' || toType === 'wall');
+            if (isBuildingTarget && amt <= capVal) return;
+
+            // 1. 扣除起点兵力
+            fromCell.army -= rawAmt;
+            if (fromCell.army <= 0) {
+                fromCell.army = 0;
+                fromCell.owner = -1;
+            }
+            renderCell(fi);
+
+            // 2. 模拟终点战斗
+            let tOwner = toCell.owner;
+            let tArmy = toCell.army;
+
+            if (tOwner === myIndex) {
+                // 己方合并
+                toCell.army = tArmy + amt;
+            } else {
+                // 战斗 / 占领
+                if (amt > tArmy) {
+                    const rem = amt - tArmy;
+                    toCell.owner = myIndex;
+                    toCell.army = rem;
+                } else {
+                    const rem = tArmy - amt;
+                    toCell.army = rem;
+                    if (rem <= 0) {
+                        toCell.army = 0;
+                        toCell.owner = -1;
+                    }
+                }
+            }
+            renderCell(ti);
+        }
 
         // ===== 控制函数 =====
         function doLogin() {
@@ -584,13 +667,12 @@
             if (d) {
                 let nx = selected.x + (d === 'left' ? -1 : (d === 'right' ? 1 : 0));
                 let ny = selected.y + (d === 'up' ? -1 : (d === 'down' ? 1 : 0));
+                
                 if (nx >= 0 && nx < MAP_W && ny >= 0 && ny < MAP_H) {
-                    socket.emit('command_move', {
-                        from: selected,
-                        to: { x: nx, y: ny },
-                        half: isHalf
-                    });
+                    const fromPos = { x: selected.x, y: selected.y };
+                    const toPos = { x: nx, y: ny };
 
+                    // 1. 移动光标 UI
                     const oldX = selected.x;
                     const oldY = selected.y;
                     if (oldX !== -1 && oldY !== -1) {
@@ -606,6 +688,16 @@
                         cellState[newIdx].sel = true;
                         renderCell(newIdx);
                     }
+
+                    // 2. 发送请求给服务器
+                    socket.emit('command_move', {
+                        from: fromPos,
+                        to: toPos,
+                        half: isHalf
+                    });
+
+                    // 3. 执行本地预测
+                    predictLocalMove(fromPos, toPos, isHalf);
                 }
             }
 
