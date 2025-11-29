@@ -174,6 +174,19 @@ class Game {
                 p.color = COLORS[i]; // <--- 颜色随位置自动更新
             });
 
+            // 同步地图归属
+            if (this.status === 'playing') {
+            for (let i = 0; i < SIZE; i++) {
+                const owner = this.owners[i];
+                if (owner === -1) continue;
+                if (owner === removedIndex) {
+                    this.owners[i] = -1; // 兵变中立
+                } else if (owner > removedIndex) {
+                    this.owners[i] = owner - 1; // 后面人的 ID 减 1，与玩家列表同步变化
+                }
+            }
+        }
+
             this.lastViews.delete(socketId);
             if (wasHost && this.players.length > 0) {
                 this.players[0].isHost = true;
@@ -742,7 +755,7 @@ class Game {
             if (owner === -1) continue;
 
             const type = this.types[i];
-            const range = (type === 'tower') ? 2 : 1;
+            const range = (type === 'tower') ? 5 : 1;
             const y = Math.floor(i / MAP_W);
             const x = i % MAP_W;
             const base = owner * SIZE;
