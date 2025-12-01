@@ -167,6 +167,8 @@ class Game {
         if (idx !== -1) {
             const wasHost = this.players[idx].isHost;
             this.players.splice(idx, 1);
+
+            const removedIndex = this.players[idx].index;
             
             // 重新计算所有人的 index 和 color
             this.players.forEach((p, i) => {
@@ -599,6 +601,7 @@ class Game {
         const fi = from.y * MAP_W + from.x;
         const ti = to.y * MAP_W + to.x;
         if (fi < 0 || fi >= SIZE || ti < 0 || ti >= SIZE) return;
+        if (Math.abs(from.x - to.x) + Math.abs(from.y - to.y) !== 1) return;
         if (this.owners[fi] !== pid || this.armies[fi] <= 1) return;
 
         const fromType = this.types[fi];

@@ -473,6 +473,7 @@
             isInLobby = true;
             ui.overlay.style.display = 'flex';
             document.getElementById('turn-count').innerText = '0';
+            clearSelection();
         });
 
         socket.on('game_over', idx => {
