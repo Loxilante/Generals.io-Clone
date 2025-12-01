@@ -225,8 +225,13 @@
         let isHost = false;
         let isInLobby = true;
         let isHalf = false;
-        let myIndex = -1; // 记录自己的玩家索引
+        let myIndex = -1; // 记录光标索引
+        let myGeneralIndex = -1; // 记录将军的位置
         let lastBoardHtml = '';
+        const shortcuts = new Map(); // 存储快捷键:
+        let isCtrl = false;          // 是否按住 Ctrl
+        let isSpectator = false;     // CapsLock
+        
 
         function makeDefaultCellState() {
             return {
@@ -310,7 +315,15 @@
                 // 不显示文字
             }
 
-            el.innerText = txt;
+            // 快捷键数字 (左上角)
+            for (const [key, val] of shortcuts.entries()) {
+                if (val === idx) {
+                    txt += `<div class="shortcut-label">${key}</div>`;
+                    break; // 一个格子只显示一个快捷键
+                }
+            }
+
+            el.innerHTML = txt;
         }
 
 
@@ -500,6 +513,7 @@
             }
 
             if (data.full) {
+                myGeneralIndex = -1;
                 const { armies, owners, types, fogs } = data;
                 for (let i = 0; i < SIZE; i++) {
                     const st = cellState[i];
@@ -507,6 +521,9 @@
                     st.owner = owners[i];
                     st.type = types[i];
                     st.fog = fogs[i] === 1;
+                    if (st.owner === myIndex && st.type === 'general') {
+                        myGeneralIndex = i;
+                    }
                     renderCell(i);
                 }
             } else if (Array.isArray(data.changes)) {
@@ -678,12 +695,69 @@
 
         // ===== 键盘控制 =====
         document.addEventListener('keydown', e => {
-            if (isInLobby) return;
+            // 如果在输入框打字，忽略
+            if (isInLobby || document.activeElement.tagName === 'INPUT') return;
 
-            if (e.key === 'z' || e.key === 'Shift') isHalf = true;
+            // 禁止默认滚动 (方向键/空格)
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
 
-            if (selected.x === -1) return;
+            // --- 状态键逻辑 ---
 
+            // 左Shift: 分兵
+            if (e.key === 'Shift') isHalf = true;
+            // Ctrl: 加速
+            if (e.key === 'Control') isCtrl = true;
+
+            // CapsLock: 切换旁观/指挥模式
+            if (e.code === 'CapsLock') {
+                isSpectator = !isSpectator; // 切换状态
+                return;
+            }
+
+            // --- 功能键逻辑 ---
+
+            // 空格：回到将军
+            if (e.code === 'Space') {
+                if (myGeneralIndex !== -1) {
+                    moveCursorTo(myGeneralIndex % MAP_W, Math.floor(myGeneralIndex / MAP_W));
+                } else {
+                    showToast('未找到将军', 'error');
+                }
+                return;
+            }
+
+            // 设置快捷键 (Alt+Num) 或 跳转 (Num)
+            if (e.key >= '0' && e.key <= '9') {
+                const num = e.key;
+                if (e.altKey) {
+                    // Alt + 数字：设置当前位置为快捷键
+                    if (selected.x !== -1) {
+                        const idx = selected.y * MAP_W + selected.x;
+                        
+                        // 清除该数字之前的绑定
+                        if (shortcuts.has(num)) {
+                            const oldIdx = shortcuts.get(num);
+                            shortcuts.delete(num); // 删除绑定
+                            renderCell(oldIdx);    // 重绘旧格子
+                        }
+
+                        shortcuts.set(num, idx);
+                        renderCell(idx); // 刷新显示数字
+                        showToast(`位置已绑定到按键 ${num}`);
+                    }
+                } else {
+                    // 单按数字：跳转
+                    if (shortcuts.has(num)) {
+                        const idx = shortcuts.get(num);
+                        moveCursorTo(idx % MAP_W, Math.floor(idx / MAP_W));
+                    }
+                }
+                return;
+            }
+
+            // C. 方向键移动
             const dirs = {
                 'w': 'up', 'ArrowUp': 'up',
                 's': 'down', 'ArrowDown': 'down',
@@ -692,51 +766,90 @@
             };
             const d = dirs[e.key];
 
-            if (d) {
-                let nx = selected.x + (d === 'left' ? -1 : (d === 'right' ? 1 : 0));
-                let ny = selected.y + (d === 'up' ? -1 : (d === 'down' ? 1 : 0));
+            if (d && selected.x !== -1) {
+
+                // 保险: 物理状态上没按Shift, 重置状态
+                if (!e.shiftKey) isHalf = false;
+
+                // 计算步长：ctrl按住走3格，否则走1格
+                const step = isCtrl ? 3 : 1;
                 
-                if (nx >= 0 && nx < MAP_W && ny >= 0 && ny < MAP_H) {
+                let nx = selected.x;
+                let ny = selected.y;
+
+                if (d === 'left') nx -= step;
+                if (d === 'right') nx += step;
+                if (d === 'up') ny -= step;
+                if (d === 'down') ny += step;
+
+                // 边界限制 (Clamp)
+                nx = Math.max(0, Math.min(MAP_W - 1, nx));
+                ny = Math.max(0, Math.min(MAP_H - 1, ny));
+
+                // 逻辑分支
+                if (step > 1 || isSpectator) {
+                    // 1. 如果加速或旁观，只移动光标
+                    moveCursorTo(nx, ny);
+                } else {
+                    // 2. 普通模式：移动光标 + 发送指令
+                    // 注意：普通模式不支持一次跨3格发指令
+                    // 所以如果没按特殊键，步长肯定是1，正常发包
+                    
                     const fromPos = { x: selected.x, y: selected.y };
                     const toPos = { x: nx, y: ny };
 
-                    // 1. 移动光标 UI
-                    const oldX = selected.x;
-                    const oldY = selected.y;
-                    if (oldX !== -1 && oldY !== -1) {
-                        const oldIdx = oldY * MAP_W + oldX;
-                        if (cellState[oldIdx]) {
-                            cellState[oldIdx].sel = false;
-                            renderCell(oldIdx);
-                        }
-                    }
-                    selected = { x: nx, y: ny };
-                    const newIdx = ny * MAP_W + nx;
-                    if (cellState[newIdx]) {
-                        cellState[newIdx].sel = true;
-                        renderCell(newIdx);
-                    }
+                    // 先动光标
+                    moveCursorTo(nx, ny);
 
-                    // 2. 发送请求给服务器
-                    socket.emit('command_move', {
-                        from: fromPos,
-                        to: toPos,
-                        half: isHalf
-                    });
+                    // 发送指令 (仅当距离为1时，或者是你以后想做寻路)
+                    // 目前服务端限制了距离必须为1，所以 step>1 的时候不能发包，只动光标
+                    if (step === 1) {
+                        socket.emit('command_move', {
+                            from: fromPos,
+                            to: toPos,
+                            half: isHalf // 此时 isHalf 由 ShiftLeft 控制
+                        });
 
-                    // 3. 执行本地预测
-                    predictLocalMove(fromPos, toPos, isHalf);
+                        // 本地预测
+                        try {
+                            if (typeof predictLocalMove === 'function') {
+                                predictLocalMove(fromPos, toPos, isHalf);
+                            }
+                        } catch (err) { console.warn(err); }
+                    }
                 }
-            }
-
-            if (e.code === 'Space') {
-                clearSelection();
             }
         });
 
         document.addEventListener('keyup', e => {
-            if (e.key === 'z' || e.key === 'Shift') isHalf = false;
+            if (e.key === 'Shift') isHalf = false;
+            if (e.key === 'Control') isCtrl = false;
         });
+
+        // 辅助函数：移动光标并刷新 UI
+        function moveCursorTo(x, y) {
+            const oldX = selected.x;
+            const oldY = selected.y;
+            
+            // 刷新旧格子 (去高亮)
+            if (oldX !== -1 && oldY !== -1) {
+                const oldIdx = oldY * MAP_W + oldX;
+                if (cellState[oldIdx]) {
+                    cellState[oldIdx].sel = false;
+                    renderCell(oldIdx);
+                }
+            }
+
+            // 更新坐标
+            selected = { x, y };
+
+            // 刷新新格子 (加高亮)
+            const newIdx = y * MAP_W + x;
+            if (cellState[newIdx]) {
+                cellState[newIdx].sel = true;
+                renderCell(newIdx);
+            }
+        }
     </script>
 </body>
 </html>

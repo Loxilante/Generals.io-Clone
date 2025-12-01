@@ -166,9 +166,10 @@ class Game {
         const idx = this.players.findIndex(p => p.socketId === socketId);
         if (idx !== -1) {
             const wasHost = this.players[idx].isHost;
-            this.players.splice(idx, 1);
 
             const removedIndex = this.players[idx].index;
+
+            this.players.splice(idx, 1);
             
             // 重新计算所有人的 index 和 color
             this.players.forEach((p, i) => {

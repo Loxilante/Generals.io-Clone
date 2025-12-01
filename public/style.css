@@ -259,6 +259,19 @@ body {
 .cell.fog.portal    { background: #311b92 !important; box-shadow: 0 0 4px rgba(149,117,205,0.7); }
 .cell.fog.unknown   { background: #080808 !important; }
 
+/* 左上角快捷键数字 */
+.shortcut-label {
+    position: absolute;
+    top: 0px;
+    left: 2px;
+    font-size: 10px;
+    color: #00e5ff; /* 亮青色，显眼 */
+    font-weight: bold;
+    z-index: 15; /* 只有文字，不需要太高，但在背景之上 */
+    text-shadow: 1px 1px 0 #000;
+    pointer-events: none; /* 鼠标点透 */
+}
+
 /* --- 大厅 UI --- */
 #lobby-overlay {
     position: absolute;
