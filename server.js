@@ -700,11 +700,13 @@ class Game {
     }
 
     kickPlayer(idx) {
-        if (this.players[idx]) {
-            this.removePlayer(this.players[idx].socketId);
-            this.broadcastLobby();
-        }
+    const pl = this.players[idx];
+    if (pl) {
+        io.to(pl.socketId).emit('kicked');
+        this.removePlayer(pl.socketId);
+        this.broadcastLobby();
     }
+}
 
     broadcastLobby() {
         const list = this.players.map(p => ({
@@ -813,7 +815,7 @@ class Game {
                         // 不传输将军
                         t = 'city';
                     }
-                    if (['mountain', 'city', 'wall', 'tower', 'portal', 'general'].includes(realType)) {
+                    if (['mountain', 'city', 'wall', 'tower', 'portal'].includes(realType)) {
                         t = realType;
                     } else {
                         t = 'unknown';

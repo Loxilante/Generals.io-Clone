@@ -127,7 +127,7 @@ body {
 
 /* 迷雾里的障碍物 */
 .cell.fog.fog-obstacle {
-    background: #4a4a4a !important; /* 比底色稍微亮一点的灰色 */
+    background: #2f2f2f !important; /* 深灰色 */
     border: 1px solid #555 !important;
     border-radius: 0 !important; /* 强制方块 */
     background-image: none !important; /* 去掉图片 */

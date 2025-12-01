@@ -257,8 +257,7 @@
                 // 障碍物:'fog-obstacle'
                 const obstacles = ['mountain', 'city', 'wall', 'tower', 'portal', 'general'];
                 
-                // 注意：服务端发来的数据里，General 可能已经被伪装成 City 了，
-                // 但不管它是啥，只要是障碍物，统统变成 'fog-obstacle'
+                // 障碍物 -> 'fog-obstacle'
                 if (obstacles.includes(type)) {
                     classes.push('fog-obstacle');
                 } else {
@@ -473,6 +472,7 @@
         socket.on('game_reset', () => {
             isInLobby = true;
             ui.overlay.style.display = 'flex';
+            document.getElementById('turn-count').innerText = '0';
         });
 
         socket.on('game_over', idx => {
