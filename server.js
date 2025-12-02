@@ -744,8 +744,8 @@ class Game {
         if (ns.growthLambda != null) ns.growthLambda = Math.max(0, Number(ns.growthLambda) || 1);
 
         // 地图尺寸设置 (仅在等待状态可修改)
-        if (ns.mapWidth != null) ns.mapWidth = Math.max(10, Math.min(50, Math.floor(Number(ns.mapWidth) || 20)));
-        if (ns.mapHeight != null) ns.mapHeight = Math.max(10, Math.min(50, Math.floor(Number(ns.mapHeight) || 20)));
+        if (ns.mapWidth != null) ns.mapWidth = Math.max(4, Math.min(100, Math.floor(Number(ns.mapWidth) || 20)));
+        if (ns.mapHeight != null) ns.mapHeight = Math.max(4, Math.min(100, Math.floor(Number(ns.mapHeight) || 20)));
 
         this.settings = { ...this.settings, ...ns };
 

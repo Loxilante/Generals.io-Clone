@@ -51,7 +51,7 @@
 
 <!-- 游戏区域 -->
 <div id="game-container">
-    <div id="grid"></div>
+    <canvas id="grid"></canvas>
 
     <!-- 大厅遮罩 -->
     <div id="lobby-overlay">
@@ -129,12 +129,12 @@
                         <!-- 地图尺寸 -->
                         <div class="setting-row">
                             <label>地图宽度:</label>
-                            <input type="number" id="set-map-width" value="20" min="10" max="50">
+                            <input type="number" id="set-map-width" value="20" min="4" max="100">
                         </div>
 
                         <div class="setting-row">
                             <label>地图高度:</label>
-                            <input type="number" id="set-map-height" value="20" min="10" max="50">
+                            <input type="number" id="set-map-height" value="20" min="4" max="100">
                         </div>
 
                         <hr style="border-color:#333;margin:10px 0;">
@@ -235,7 +235,6 @@
 
     const bloodIndicator = document.getElementById('blood-moon-indicator');
 
-    let cellCache = [];
     let cellState = new Array(SIZE);
     let selected = { x: -1, y: -1 };
     let isHost = false;
@@ -247,6 +246,55 @@
     const shortcuts = new Map(); // 存储快捷键:
     let isCtrl = false;          // 是否按住 Ctrl
     let isSpectator = false;     // CapsLock
+
+    // Canvas 相关
+    let canvas = null;
+    let ctx = null;
+    let cellSize = 32;
+
+    // 颜色常量 (与 CSS 保持一致)
+    const COLORS = {
+        // 玩家颜色
+        owners: ['#ef5350', '#ffcc00', '#66bb6a', '#ab47bc', '#f542aa', '#71ffd7'],
+        // 地形颜色
+        land: '#cfd8dc',
+        landText: '#333',
+        fog: '#222',
+        fogBorder: '#333',
+        fogObstacle: '#2f2f2f',
+        unknown: '#000',
+        ocean: '#01579b',
+        oceanHighlight: '#4f89ef',
+        oceanText: '#e1f5fe',
+        mountain: '#546e7a',
+        mountainTriangle: '#263238',
+        city: '#90a4ae',
+        general: '#90a4ae',
+        generalBorder: 'gold',
+        swamp: '#4e342e',
+        swampSymbol: 'rgba(255,255,255,0.3)',
+        wall: '#5d4037',
+        wallBorder: '#3e2723',
+        tower: '#78909c',
+        portal: '#4a148c',
+        portalCenter: '#ce93d8',
+        portalOuter: '#12005e',
+        portalSymbol: '#f3e5f5',
+        // 迷雾中的建筑颜色
+        fogCity: '#555',
+        fogMountain: '#333',
+        fogWall: '#3e2723',
+        fogTower: '#455a64',
+        fogPortal: '#311b92',
+        fogUnknown: '#080808',
+        // UI 颜色
+        selected: '#fffde7',
+        shortcutLabel: '#00e5ff',
+        gridBg: '#333',
+        gridBorder: '#444',
+        textWhite: '#fff',
+        textShadow: 'rgba(0,0,0,0.8)'
+    };
 
 
     function makeDefaultCellState() {
@@ -261,85 +309,220 @@
 
     function renderCell(idx) {
         const st = cellState[idx];
-        const el = cellCache[idx];
-        if (!el || !st) return;
+        if (!st || !ctx) return;
 
-        // 提取状态
+        const x = idx % MAP_W;
+        const y = Math.floor(idx / MAP_W);
+        const px = x * (cellSize + 1); // +1 for gap
+        const py = y * (cellSize + 1);
+
         let { type, owner, fog, army, sel } = st;
 
-        // 1. 生成 Class 列表
-        let classes = ['cell'];
+        ctx.save();
+        ctx.translate(px, py);
+
+        // 1. 绘制背景
+        let bgColor = COLORS.fog;
+        let textColor = COLORS.textWhite;
+        let isObstacle = false;
 
         if (fog) {
             // === 迷雾模式 ===
-            classes.push('fog');
-
-            // 在迷雾里，不加具体类型类名
-            // 障碍物:'fog-obstacle'
             const obstacles = ['mountain', 'city', 'wall', 'tower', 'portal', 'general'];
+            isObstacle = obstacles.includes(type);
 
-            // 障碍物 -> 'fog-obstacle'
-            if (obstacles.includes(type)) {
-                classes.push('fog-obstacle');
+            if (type === 'unknown') {
+                bgColor = COLORS.unknown;
+            } else if (isObstacle) {
+                // 迷雾中的障碍物特殊颜色
+                if (type === 'city' || type === 'general') bgColor = COLORS.fogCity;
+                else if (type === 'mountain') bgColor = COLORS.fogMountain;
+                else if (type === 'wall') bgColor = COLORS.fogWall;
+                else if (type === 'tower') bgColor = COLORS.fogTower;
+                else if (type === 'portal') bgColor = COLORS.fogPortal;
+                else bgColor = COLORS.fogObstacle;
             } else {
-                // 剩下的就是平地/沼泽/未知
-                if (type === 'unknown') classes.push('unknown');
-                // 平地在迷雾里不加任何特殊类，就用默认 fog 样式
+                bgColor = COLORS.fog;
             }
-
-            if (owner !== -1) {
-                // classes.push('owner-' + owner); // 如果想让迷雾里也能看到己方颜色
-            }
-
         } else {
-            // === 可见模式 (保持原样) ===
-            if (type !== 'unknown') {
+            // === 可见模式 ===
+            if (owner !== -1) {
+                bgColor = COLORS.owners[owner] || COLORS.fog;
+            } else {
+                // 无主地形
                 if (type === 'land') {
-                    // 如果是平地：没人占的时候才加 'land' 类
-                    if (owner === -1) {
-                        classes.push('land');
-                    }
+                    bgColor = COLORS.land;
+                    textColor = COLORS.landText;
+                } else if (type === 'ocean') {
+                    bgColor = COLORS.ocean;
+                    textColor = COLORS.oceanText;
+                } else if (type === 'mountain') {
+                    bgColor = COLORS.mountain;
+                } else if (type === 'city') {
+                    bgColor = COLORS.city;
+                } else if (type === 'general') {
+                    bgColor = COLORS.general;
+                } else if (type === 'swamp') {
+                    bgColor = COLORS.swamp;
+                } else if (type === 'wall') {
+                    bgColor = COLORS.wall;
+                } else if (type === 'tower') {
+                    bgColor = COLORS.tower;
+                } else if (type === 'portal') {
+                    bgColor = COLORS.portal;
+                } else if (type === 'unknown') {
+                    bgColor = COLORS.unknown;
                 } else {
-                    // 其他正常添加
-                    classes.push(type);
+                    bgColor = COLORS.fog;
                 }
             }
+        }
 
-            if (owner !== -1) {
-                classes.push('owner-' + owner);
+        // 绘制背景矩形
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, cellSize, cellSize);
+
+        // 2. 绘制特殊地形图标 (仅在非迷雾时)
+        if (!fog) {
+            // 城市：圆形
+            if (type === 'city') {
+                ctx.beginPath();
+                ctx.arc(cellSize / 2, cellSize / 2, cellSize * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = owner !== -1 ? COLORS.owners[owner] : COLORS.city;
+                ctx.fill();
+            }
+
+            // 山脉：三角形
+            if (type === 'mountain') {
+                ctx.fillStyle = COLORS.mountainTriangle;
+                ctx.beginPath();
+                ctx.moveTo(cellSize * 0.2, cellSize * 0.8);
+                ctx.lineTo(cellSize * 0.5, cellSize * 0.2);
+                ctx.lineTo(cellSize * 0.8, cellSize * 0.8);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 将军：金色边框 + 星星
+            if (type === 'general') {
+                ctx.strokeStyle = COLORS.generalBorder;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(1, 1, cellSize - 2, cellSize - 2);
+                // 星星
+                ctx.fillStyle = COLORS.generalBorder;
+                ctx.font = `${cellSize * 0.5}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('★', cellSize / 2, cellSize / 2);
+            }
+
+            // 沼泽：波浪符号
+            if (type === 'swamp') {
+                ctx.fillStyle = COLORS.swampSymbol;
+                ctx.font = `${cellSize * 0.5}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('≈', cellSize / 2, cellSize / 2);
+            }
+
+            // 墙：虚线边框
+            if (type === 'wall') {
+                ctx.strokeStyle = COLORS.wallBorder;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([3, 3]);
+                ctx.strokeRect(2, 2, cellSize - 4, cellSize - 4);
+                ctx.setLineDash([]);
+            }
+
+            // 瞭望塔：^ 符号
+            if (type === 'tower') {
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.font = `${cellSize * 0.4}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('^', cellSize / 2, cellSize / 2);
+            }
+
+            // 传送门：圆环
+            if (type === 'portal') {
+                // 渐变背景
+                const grad = ctx.createRadialGradient(cellSize/2, cellSize/2, 0, cellSize/2, cellSize/2, cellSize/2);
+                grad.addColorStop(0, COLORS.portalCenter);
+                grad.addColorStop(0.55, COLORS.portal);
+                grad.addColorStop(1, COLORS.portalOuter);
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, cellSize, cellSize);
+                // 圆环符号
+                ctx.fillStyle = COLORS.portalSymbol;
+                ctx.font = `${cellSize * 0.5}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('⭘', cellSize / 2, cellSize / 2);
+            }
+
+            // 海洋：高光效果
+            if (type === 'ocean') {
+                ctx.fillStyle = COLORS.oceanHighlight;
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.arc(cellSize * 0.2, cellSize * 0.2, cellSize * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
             }
         }
 
-        // 选中状态
-        if (sel) classes.push('selected');
-
-        el.className = classes.join(' ');
-
-        // 2. 内容渲染
-        let txt = '';
-        el.style.fontSize = '';
+        // 3. 绘制兵力数字
+        let showArmy = false;
+        let fontSize = cellSize * 0.4;
 
         if (!fog) {
-            // 可见时
             if (type === 'wall' && owner === -1) {
-                txt = army;
-                el.style.fontSize = '10px';
+                showArmy = true;
+                fontSize = cellSize * 0.3;
             } else if (type !== 'mountain' && type !== 'unknown' && army > 0) {
-                txt = army;
+                showArmy = true;
             }
-        } else {
-            // 不显示文字
         }
 
-        // 快捷键数字 (左上角)
+        if (showArmy && army > 0) {
+            ctx.fillStyle = textColor;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // 文字阴影效果
+            ctx.shadowColor = COLORS.textShadow;
+            ctx.shadowBlur = 2;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 1;
+            ctx.fillText(String(army), cellSize / 2, cellSize / 2);
+            ctx.shadowColor = 'transparent';
+        }
+
+        // 4. 选中状态：内发光边框
+        if (sel) {
+            ctx.strokeStyle = COLORS.selected;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(1.5, 1.5, cellSize - 3, cellSize - 3);
+        }
+
+        // 5. 快捷键标签 (左上角)
         for (const [key, val] of shortcuts.entries()) {
             if (val === idx) {
-                txt += `<div class="shortcut-label">${key}</div>`;
-                break; // 一个格子只显示一个快捷键
+                ctx.fillStyle = COLORS.shortcutLabel;
+                ctx.font = `bold ${cellSize * 0.3}px sans-serif`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 1;
+                ctx.shadowOffsetY = 1;
+                ctx.fillText(key, 2, 1);
+                ctx.shadowColor = 'transparent';
+                break;
             }
         }
 
-        el.innerHTML = txt;
+        ctx.restore();
     }
 
 
@@ -352,10 +535,9 @@
             SIZE = MAP_W * MAP_H;
         }
 
-        const grid = document.getElementById('grid');
-        grid.innerHTML = '';
-        cellCache = [];
-        cellState = new Array(SIZE);
+        // 获取 Canvas 元素
+        canvas = document.getElementById('grid');
+        ctx = canvas.getContext('2d');
 
         // 计算合适的格子大小以适应屏幕
         const container = document.getElementById('game-container');
@@ -365,49 +547,58 @@
         // 计算单个格子的最大尺寸 (包含1px间隙)
         const cellW = Math.floor(maxGridW / MAP_W) - 1;
         const cellH = Math.floor(maxGridH / MAP_H) - 1;
-        const cellSize = Math.max(16, Math.min(48, Math.min(cellW, cellH))); // 限制在16-48px之间
+        cellSize = Math.max(16, Math.min(48, Math.min(cellW, cellH))); // 限制在16-48px之间
 
-        // 动态设置grid样式
-        grid.style.gridTemplateColumns = `repeat(${MAP_W}, ${cellSize}px)`;
-        grid.style.gridTemplateRows = `repeat(${MAP_H}, ${cellSize}px)`;
+        // 设置 Canvas 尺寸 (包含格子间隙)
+        const canvasW = MAP_W * (cellSize + 1) - 1;
+        const canvasH = MAP_H * (cellSize + 1) - 1;
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        canvas.style.width = canvasW + 'px';
+        canvas.style.height = canvasH + 'px';
 
-        // 动态设置格子样式
-        const styleId = 'dynamic-cell-style';
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-        styleEl.textContent = `
-                #grid .cell {
-                    width: ${cellSize}px;
-                    height: ${cellSize}px;
-                    font-size: ${Math.max(10, Math.floor(cellSize * 0.4))}px;
-                }
-            `;
-
-        for (let y = 0; y < MAP_H; y++) {
-            for (let x = 0; x < MAP_W; x++) {
-                const div = document.createElement('div');
-                div.className = 'cell unknown';
-                div.dataset.x = x;
-                div.dataset.y = y;
-                div.onclick = () => selectCell(x, y);
-                grid.appendChild(div);
-                cellCache.push(div);
-            }
-        }
-
+        // 初始化 cellState 数组
+        cellState = new Array(SIZE);
         for (let i = 0; i < SIZE; i++) {
             cellState[i] = makeDefaultCellState();
+        }
+
+        // 绘制背景 (格子间隙颜色)
+        ctx.fillStyle = COLORS.gridBg;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+
+        // 绘制所有格子
+        for (let i = 0; i < SIZE; i++) {
             renderCell(i);
         }
+
+        // 设置点击事件
+        canvas.onclick = handleCanvasClick;
 
         lastBoardHtml = '';
         shortcuts.clear(); // 清除快捷键绑定
         document.getElementById('leaderboard').innerHTML = '';
         if (bloodIndicator) bloodIndicator.classList.remove('active');
+    }
+
+    // Canvas 点击事件处理
+    function handleCanvasClick(e) {
+        if (isInLobby) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        const clickX = (e.clientX - rect.left) * scaleX;
+        const clickY = (e.clientY - rect.top) * scaleY;
+
+        // 计算点击的格子坐标
+        const x = Math.floor(clickX / (cellSize + 1));
+        const y = Math.floor(clickY / (cellSize + 1));
+
+        if (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) {
+            selectCell(x, y);
+        }
     }
 
     initGrid();
