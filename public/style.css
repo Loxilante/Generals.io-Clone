@@ -73,8 +73,8 @@ body {
 }
 
 #grid {
-    background: #333;
-    border: 8px solid #444;
+    background: #111;
+    /* border 移到 Canvas 内部绘制，以便跟随缩放 */
     box-shadow: 0 0 30px rgba(0,0,0,0.8);
     cursor: pointer;
 }

@@ -252,6 +252,13 @@
     let ctx = null;
     let cellSize = 32;
 
+    // 地图平移和缩放
+    let panX = 0, panY = 0;       // 平移偏移量
+    let zoomScale = 1;            // 缩放比例
+    let isPanning = false;        // 是否正在拖动
+    let panStartX = 0, panStartY = 0;  // 拖动起始鼠标位置
+    let panStartPanX = 0, panStartPanY = 0;  // 拖动起始偏移量
+
     // 颜色常量 (与 CSS 保持一致)
     const COLORS = {
         // 玩家颜色
@@ -541,9 +548,46 @@
         ctx.restore();
     }
 
+    // 重绘整个地图（支持平移和缩放）
+    function drawBoard() {
+        if (!ctx || !canvas) return;
 
+        const dpr = window.devicePixelRatio || 1;
+        const canvasW = MAP_W * (cellSize + 1) - 1;
+        const canvasH = MAP_H * (cellSize + 1) - 1;
+
+        // 重置变换并清空画布
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = '#111';  // 画布外部背景色
+        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
+        // 应用平移和缩放变换
+        ctx.translate(panX, panY);
+        ctx.scale(zoomScale, zoomScale);
+
+        // 绘制格子间隙背景
+        ctx.fillStyle = COLORS.gridBg;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+
+        // 绘制所有格子
+        for (let i = 0; i < SIZE; i++) {
+            renderCell(i);
+        }
+
+        // 绘制边框（跟随缩放）
+        const borderWidth = 8;
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = borderWidth;
+        ctx.strokeRect(-borderWidth / 2, -borderWidth / 2, canvasW + borderWidth, canvasH + borderWidth);
+    }
 
     function initGrid(newW, newH) {
+        // 重置平移和缩放
+        panX = 0;
+        panY = 0;
+        zoomScale = 1;
+        isPanning = false;
+
         // 如果传入了新尺寸，更新全局变量
         if (newW && newH) {
             MAP_W = newW;
@@ -555,19 +599,27 @@
         canvas = document.getElementById('grid');
         ctx = canvas.getContext('2d');
 
-        // 计算合适的格子大小以适应屏幕
+        // 获取容器尺寸
         const container = document.getElementById('game-container');
-        const maxGridW = container.clientWidth - 40;  // 留出边距
-        const maxGridH = container.clientHeight - 40;
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+
+        // 计算合适的格子大小以适应屏幕（留出边距）
+        const maxGridW = containerW - 40;
+        const maxGridH = containerH - 40;
 
         // 计算单个格子的最大尺寸 (包含1px间隙)
         const cellW = Math.floor(maxGridW / MAP_W) - 1;
         const cellH = Math.floor(maxGridH / MAP_H) - 1;
         cellSize = Math.max(16, Math.min(48, Math.min(cellW, cellH))); // 限制在16-48px之间
 
-        // 设置 Canvas 尺寸 (包含格子间隙)
-        const canvasW = MAP_W * (cellSize + 1) - 1;
-        const canvasH = MAP_H * (cellSize + 1) - 1;
+        // 计算地图的逻辑尺寸
+        const mapLogicalW = MAP_W * (cellSize + 1) - 1;
+        const mapLogicalH = MAP_H * (cellSize + 1) - 1;
+
+        // Canvas 尺寸等于容器尺寸（而非地图尺寸），以便支持平移和缩放时地图可以在整个容器内显示
+        const canvasW = containerW;
+        const canvasH = containerH;
 
         // 高分屏支持：使用 devicePixelRatio 缩放
         const dpr = window.devicePixelRatio || 1;
@@ -577,23 +629,115 @@
         canvas.style.height = canvasH + 'px';
         ctx.scale(dpr, dpr);
 
+        // 初始化平移使地图居中显示
+        panX = (canvasW - mapLogicalW) / 2;
+        panY = (canvasH - mapLogicalH) / 2;
+
         // 初始化 cellState 数组
         cellState = new Array(SIZE);
         for (let i = 0; i < SIZE; i++) {
             cellState[i] = makeDefaultCellState();
         }
 
-        // 绘制背景 (格子间隙颜色)
-        ctx.fillStyle = COLORS.gridBg;
-        ctx.fillRect(0, 0, canvasW, canvasH);
-
-        // 绘制所有格子
-        for (let i = 0; i < SIZE; i++) {
-            renderCell(i);
-        }
+        // 使用 drawBoard() 绘制（支持平移和缩放）
+        drawBoard();
 
         // 设置点击事件
         canvas.onclick = handleCanvasClick;
+
+        // ===== 右键拖动和滚轮缩放 =====
+
+        // 屏蔽浏览器右键菜单和手势（捕获阶段，优先级最高）
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+        }, { capture: true });
+
+        // 在 document 级别也屏蔽（防止某些浏览器在更高层级处理）
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target === canvas) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            }
+        }, { capture: true });
+
+        // 右键按下开始拖动（捕获阶段）
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 2) {  // 右键
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                isPanning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                panStartPanX = panX;
+                panStartPanY = panY;
+                canvas.style.cursor = 'grabbing';
+            }
+        }, { capture: true });
+
+        // 鼠标移动时拖动地图
+        canvas.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                e.preventDefault();
+                panX = panStartPanX + (e.clientX - panStartX);
+                panY = panStartPanY + (e.clientY - panStartY);
+                drawBoard();
+            }
+        });
+
+        // 松开鼠标停止拖动
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 2) {
+                isPanning = false;
+                canvas.style.cursor = 'pointer';
+            }
+        });
+
+        // 鼠标离开 Canvas 也停止拖动
+        canvas.addEventListener('mouseleave', () => {
+            if (isPanning) {
+                isPanning = false;
+                canvas.style.cursor = 'pointer';
+            }
+        });
+
+        // 滚轮缩放
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // 计算缩放前鼠标在地图上的位置
+            const beforeX = (mouseX - panX) / zoomScale;
+            const beforeY = (mouseY - panY) / zoomScale;
+
+            // 调整缩放比例
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;  // 向下滚动缩小，向上滚动放大
+            zoomScale *= zoomFactor;
+            zoomScale = Math.max(0.5, Math.min(3, zoomScale));  // 限制缩放范围 0.5x ~ 3x
+
+            // 计算缩放后鼠标在地图上的位置，调整平移使鼠标位置不变
+            const afterX = (mouseX - panX) / zoomScale;
+            const afterY = (mouseY - panY) / zoomScale;
+            panX += (afterX - beforeX) * zoomScale;
+            panY += (afterY - beforeY) * zoomScale;
+
+            // 如果正在拖动中，同步更新拖动起始点，避免缩放后拖动时地图闪现
+            if (isPanning) {
+                panStartPanX = panX;
+                panStartPanY = panY;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+            }
+
+            drawBoard();
+        }, { passive: false });
 
         lastBoardHtml = '';
         shortcuts.clear(); // 清除快捷键绑定
@@ -603,18 +747,21 @@
 
     // Canvas 点击事件处理
     function handleCanvasClick(e) {
-        if (isInLobby) return;
+        if (isInLobby || isPanning) return;
 
         const rect = canvas.getBoundingClientRect();
-        
-        // 直接使用 CSS 坐标（逻辑像素），无需考虑 devicePixelRatio
-        // 因为 rect.width/height 是 CSS 尺寸，cellSize 也是逻辑尺寸
+
+        // 获取点击的 CSS 坐标
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
 
+        // 反向计算：考虑平移和缩放
+        const mapX = (clickX - panX) / zoomScale;
+        const mapY = (clickY - panY) / zoomScale;
+
         // 计算点击的格子坐标
-        const x = Math.floor(clickX / (cellSize + 1));
-        const y = Math.floor(clickY / (cellSize + 1));
+        const x = Math.floor(mapX / (cellSize + 1));
+        const y = Math.floor(mapY / (cellSize + 1));
 
         if (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) {
             selectCell(x, y);
@@ -798,8 +945,8 @@
                 if (st.owner === myIndex && st.type === 'general') {
                     myGeneralIndex = i;
                 }
-                renderCell(i);
             }
+            drawBoard();  // 使用 drawBoard() 支持平移和缩放
         } else if (Array.isArray(data.changes)) {
             for (const c of data.changes) {
                 const i = c.i;
@@ -809,8 +956,8 @@
                 st.owner = c.o;
                 st.type = c.t;
                 st.fog = c.f === 1;
-                renderCell(i);
             }
+            drawBoard();  // 使用 drawBoard() 支持平移和缩放
         }
 
         // 计分板

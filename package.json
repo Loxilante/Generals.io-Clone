@@ -1,6 +1,6 @@
 {
   "name": "generals-pro-server",
-  "version": "1.1.0",
+  "version": "2.3.0",
   "description": "Generals.io Pro",
   "main": "server.js",
   "scripts": {
