@@ -384,8 +384,12 @@
 
         // 2. 绘制特殊地形图标 (仅在非迷雾时)
         if (!fog) {
-            // 城市：圆形
+            // 城市：深色背景 + 中央圆形
             if (type === 'city') {
+                // 先填充深色背景（格子间隙的颜色）
+                ctx.fillStyle = COLORS.gridBg;
+                ctx.fillRect(0, 0, cellSize, cellSize);
+                // 再画中央的圆形
                 ctx.beginPath();
                 ctx.arc(cellSize / 2, cellSize / 2, cellSize * 0.4, 0, Math.PI * 2);
                 ctx.fillStyle = owner !== -1 ? COLORS.owners[owner] : COLORS.city;
@@ -460,14 +464,29 @@
                 ctx.fillText('⭘', cellSize / 2, cellSize / 2);
             }
 
-            // 海洋：高光效果
+            // 海洋：双重渐变高光效果 (模拟原 CSS 样式)
             if (type === 'ocean') {
-                ctx.fillStyle = COLORS.oceanHighlight;
-                ctx.globalAlpha = 0.3;
-                ctx.beginPath();
-                ctx.arc(cellSize * 0.2, cellSize * 0.2, cellSize * 0.3, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
+                // 第一个高光 (左上角)
+                const grad1 = ctx.createRadialGradient(
+                    cellSize * 0.1, cellSize * 0.1, 0,
+                    cellSize * 0.1, cellSize * 0.1, cellSize * 0.5
+                );
+                grad1.addColorStop(0, 'rgba(79, 137, 239, 0.6)');   // #4f89ef
+                grad1.addColorStop(0.4, 'rgba(79, 137, 239, 0.2)');
+                grad1.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad1;
+                ctx.fillRect(0, 0, cellSize, cellSize);
+
+                // 第二个高光 (右下角)
+                const grad2 = ctx.createRadialGradient(
+                    cellSize * 0.7, cellSize * 0.7, 0,
+                    cellSize * 0.7, cellSize * 0.7, cellSize * 0.55
+                );
+                grad2.addColorStop(0, 'rgba(2, 136, 209, 0.5)');    // #0288d1
+                grad2.addColorStop(0.45, 'rgba(2, 136, 209, 0.15)');
+                grad2.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad2;
+                ctx.fillRect(0, 0, cellSize, cellSize);
             }
         }
 
@@ -552,10 +571,14 @@
         // 设置 Canvas 尺寸 (包含格子间隙)
         const canvasW = MAP_W * (cellSize + 1) - 1;
         const canvasH = MAP_H * (cellSize + 1) - 1;
-        canvas.width = canvasW;
-        canvas.height = canvasH;
+
+        // 高分屏支持：使用 devicePixelRatio 缩放
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = canvasW * dpr;
+        canvas.height = canvasH * dpr;
         canvas.style.width = canvasW + 'px';
         canvas.style.height = canvasH + 'px';
+        ctx.scale(dpr, dpr);
 
         // 初始化 cellState 数组
         cellState = new Array(SIZE);

@@ -1,5 +1,12 @@
 # Changelog
 
+## [v2.3.0-preview.2] - 2025-12-02
+
+### Fixed
+- 修复高分屏（HiDPI/Retina）Canvas 模糊问题：使用 `devicePixelRatio` 缩放画布。
+- 修复城市圆圈不可见问题：先绘制深色背景再绘制中央圆形。
+- 改进海洋样式：使用双重渐变高光效果，模拟原 CSS 的 `radial-gradient` 样式。
+
 ## [v2.3.0-preview.1] - 2025-12-02
 
 ### Changed
