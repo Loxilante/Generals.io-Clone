@@ -841,13 +841,13 @@ class Game {
                     o = -1;
                     f = 1;
 
-                    // 特殊建筑在迷雾中依然保留类型标识
-                    if (realType === 'general') {
-                        // 不传输将军
-                        t = 'city';
-                    }
-                    if (['mountain', 'city', 'wall', 'tower', 'portal'].includes(realType)) {
-                        t = realType;
+                    // 迷雾模式：只显示是否有建筑，不显示具体类型
+                    if (realType === 'mountain') {
+                        // 山脉保持可见（不可通行的地形）
+                        t = 'mountain';
+                    } else if (['general', 'city', 'wall', 'tower', 'portal'].includes(realType)) {
+                        // 所有建筑统一显示为 'obstacle'（只知道有建筑，不知道是什么）
+                        t = 'obstacle';
                     } else {
                         t = 'unknown';
                     }

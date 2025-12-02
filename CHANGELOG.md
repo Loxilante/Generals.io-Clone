@@ -1,5 +1,12 @@
 # Changelog
 
+## [v2.3.0-preview.3] - 2025-12-02
+
+### Changed
+- 迷雾区域中只能看到哪些位置有建筑（显示为 'obstacle'），无法辨别具体是什么建筑类型（原逻辑）。
+- 服务器端 `broadcastState()` 函数修改：迷雾区域的建筑统一发送为 'obstacle' 类型。
+- 客户端 `renderCell()` 函数修改：简化迷雾模式的渲染逻辑，只区分 'unknown'、'mountain' 和 'obstacle' 三种类型。
+
 ## [v2.3.0-preview.2] - 2025-12-02
 
 ### Fixed

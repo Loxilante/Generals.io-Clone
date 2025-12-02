@@ -328,19 +328,16 @@
 
         if (fog) {
             // === 迷雾模式 ===
-            const obstacles = ['mountain', 'city', 'wall', 'tower', 'portal', 'general'];
-            isObstacle = obstacles.includes(type);
-
             if (type === 'unknown') {
                 bgColor = COLORS.unknown;
-            } else if (isObstacle) {
-                // 迷雾中的障碍物特殊颜色
-                if (type === 'city' || type === 'general') bgColor = COLORS.fogCity;
-                else if (type === 'mountain') bgColor = COLORS.fogMountain;
-                else if (type === 'wall') bgColor = COLORS.fogWall;
-                else if (type === 'tower') bgColor = COLORS.fogTower;
-                else if (type === 'portal') bgColor = COLORS.fogPortal;
-                else bgColor = COLORS.fogObstacle;
+            } else if (type === 'mountain') {
+                // 山脉在迷雾中保持可见（不可通行的地形）
+                bgColor = COLORS.fogMountain;
+                isObstacle = true;
+            } else if (type === 'obstacle') {
+                // 迷雾模式：只知道有建筑，不知道具体是什么
+                bgColor = COLORS.fogObstacle;
+                isObstacle = true;
             } else {
                 bgColor = COLORS.fog;
             }
