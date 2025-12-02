@@ -33,11 +33,11 @@ const db = new sqlite3.Database('./game.db', (err) => {
 // 包含字段: username (主键), password, wins (胜场), games (总场次)
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT,
-        wins INTEGER DEFAULT 0,
-        games INTEGER DEFAULT 0
-    )`);
+                                                 username TEXT PRIMARY KEY,
+                                                 password TEXT,
+                                                 wins INTEGER DEFAULT 0,
+                                                 games INTEGER DEFAULT 0
+            )`);
 });
 
 // 封装数据库查询方法 (Promise wrapper for db.get)
@@ -65,8 +65,7 @@ function dbRun(sql, params = []) {
 // ==========================================
 // 游戏逻辑类
 // ==========================================
-const MAP_W = 20, MAP_H = 20;
-const SIZE  = MAP_W * MAP_H;
+const DEFAULT_MAP_W = 20, DEFAULT_MAP_H = 20;
 const COLORS = [
     '#ef5350',
     '#ffcc00',
@@ -81,9 +80,14 @@ class Game {
         this.id = id;
         this.players = [];  // 存储玩家信息对象
 
-        this.types  = new Array(SIZE).fill('land');
-        this.armies = new Int32Array(SIZE).fill(0);
-        this.owners = new Int8Array(SIZE).fill(-1);
+        // 地图尺寸 (可由房主设置)
+        this.mapW = DEFAULT_MAP_W;
+        this.mapH = DEFAULT_MAP_H;
+        this.size = this.mapW * this.mapH;
+
+        this.types  = new Array(this.size).fill('land');
+        this.armies = new Int32Array(this.size).fill(0);
+        this.owners = new Int8Array(this.size).fill(-1);
 
         this.status = 'waiting';
         this.turn = 0;
@@ -103,7 +107,10 @@ class Game {
 
             growthMode: 'poisson',
             growthPeriod: 25,
-            growthLambda: 1
+            growthLambda: 1,
+
+            mapWidth: DEFAULT_MAP_W,
+            mapHeight: DEFAULT_MAP_H
         };
 
         this.lastViews = new Map();     // socketId -> 玩家视图缓存
@@ -114,10 +121,10 @@ class Game {
 
     createEmptyView() {
         return {
-            armies: new Int32Array(SIZE),
-            owners: new Int8Array(SIZE),
-            types:  new Array(SIZE).fill('unknown'),
-            fogs:   new Uint8Array(SIZE),
+            armies: new Int32Array(this.size),
+            owners: new Int8Array(this.size),
+            types:  new Array(this.size).fill('unknown'),
+            fogs:   new Uint8Array(this.size),
             initialized: false
         };
     }
@@ -137,7 +144,7 @@ class Game {
 
     addPlayer(socketId, username, nickname) {
         if (this.players.length >= 6) return { success: false, msg: '房间满员' };
-        
+
         // 检查当前房间内是否已有相同账号登录
         if (this.players.find(p => p.account === username)) {
             return { success: false, msg: '该账号已在房间中' };
@@ -156,7 +163,7 @@ class Game {
             color: COLORS[this.players.length],
             index: this.players.length
         });
-        
+
         // 重置索引以确保连续性
         this.players.forEach((p, i) => p.index = i);
         return { success: true };
@@ -170,7 +177,7 @@ class Game {
             const removedIndex = this.players[idx].index;
 
             this.players.splice(idx, 1);
-            
+
             // 重新计算所有人的 index 和 color
             this.players.forEach((p, i) => {
                 p.index = i;
@@ -179,16 +186,16 @@ class Game {
 
             // 同步地图归属
             if (this.status === 'playing') {
-            for (let i = 0; i < SIZE; i++) {
-                const owner = this.owners[i];
-                if (owner === -1) continue;
-                if (owner === removedIndex) {
-                    this.owners[i] = -1; // 兵变中立
-                } else if (owner > removedIndex) {
-                    this.owners[i] = owner - 1; // 后面人的 ID 减 1，与玩家列表同步变化
+                for (let i = 0; i < this.size; i++) {
+                    const owner = this.owners[i];
+                    if (owner === -1) continue;
+                    if (owner === removedIndex) {
+                        this.owners[i] = -1; // 兵变中立
+                    } else if (owner > removedIndex) {
+                        this.owners[i] = owner - 1; // 后面人的 ID 减 1，与玩家列表同步变化
+                    }
                 }
             }
-        }
 
             this.lastViews.delete(socketId);
             if (wasHost && this.players.length > 0) {
@@ -255,7 +262,7 @@ class Game {
     }
 
     generateMap(force = false) {
-        const idx = (x, y) => y * MAP_W + x;
+        const idx = (x, y) => y * this.mapW + x;
         const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
         this.types.fill('land');
@@ -264,7 +271,7 @@ class Game {
         this.portalCells = [];
 
         // 1. 生成基础地形 (山脉、沼泽、墙)
-        for (let i = 0; i < SIZE; i++) {
+        for (let i = 0; i < this.size; i++) {
             let r = Math.random();
             if (r < 0.18) {
                 this.types[i] = 'mountain';
@@ -280,44 +287,44 @@ class Game {
         // 2. 生成海洋 - 使用 BFS 生成连片区域
         const oceanRatio = Math.max(0, Math.min(1, Number(this.settings.oceanRatio) || 0));
         if (oceanRatio > 0) {
-            const desired = Math.floor(SIZE * oceanRatio);
+            const desired = Math.floor(this.size * oceanRatio);
             if (desired > 0) {
                 let oceanCount = 0;
                 let blobTries  = 0;
                 const avgBlobSize = 25;
                 const maxBlobs    = Math.max(1, Math.floor(desired / avgBlobSize));
-            
+
                 while (oceanCount < desired && blobTries < maxBlobs * 5) {
                     blobTries++;
                     let seed = -1;
                     // 寻找随机种子点
                     for (let k = 0; k < 200; k++) {
-                        const i = Math.floor(Math.random() * SIZE);
+                        const i = Math.floor(Math.random() * this.size);
                         if (this.types[i] === 'land') {
                             seed = i;
                             break;
                         }
                     }
                     if (seed === -1) break;
-                
+
                     const blobTarget = avgBlobSize / 2 + Math.floor(Math.random() * avgBlobSize);
                     const q = [seed];
                     const used = new Set([seed]);
-                
+
                     while (q.length && oceanCount < desired && used.size < blobTarget) {
                         const cur = q.shift();
-                        const cy = Math.floor(cur / MAP_W);
-                        const cx = cur % MAP_W;
-                    
+                        const cy = Math.floor(cur / this.mapW);
+                        const cx = cur % this.mapW;
+
                         if (this.types[cur] === 'land') {
                             this.types[cur] = 'ocean';
                             oceanCount++;
                         }
-                    
+
                         for (const [dx, dy] of dirs) {
                             const nx = cx + dx, ny = cy + dy;
-                            if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
-                            const ni = ny * MAP_W + nx;
+                            if (nx < 0 || nx >= this.mapW || ny < 0 || ny >= this.mapH) continue;
+                            const ni = ny * this.mapW + nx;
                             if (used.has(ni)) continue;
                             used.add(ni);
                             if (this.types[ni] === 'land') {
@@ -330,7 +337,7 @@ class Game {
         }
 
         // 3. 生成城市与塔
-        for (let i = 0; i < SIZE; i++) {
+        for (let i = 0; i < this.size; i++) {
             const t = this.types[i];
             if (t === 'mountain' || t === 'wall') continue;
             const r = Math.random();
@@ -350,8 +357,8 @@ class Game {
         for (let p = 0; p < this.players.length; p++) {
             let placed = false;
             for (let k = 0; k < 200; k++) {
-                const x = Math.floor(Math.random() * MAP_W);
-                const y = Math.floor(Math.random() * MAP_H);
+                const x = Math.floor(Math.random() * this.mapW);
+                const y = Math.floor(Math.random() * this.mapH);
                 const ii = idx(x, y);
                 const t = this.types[ii];
                 // 确保起始点不在障碍物或特殊建筑上
@@ -385,7 +392,7 @@ class Game {
                 return t !== 'mountain' && t !== 'wall';
             };
 
-            const visited = new Uint8Array(SIZE);
+            const visited = new Uint8Array(this.size);
             const q = [];
             const s0 = starts[0];
             const startIdx = idx(s0.x, s0.y);
@@ -394,11 +401,11 @@ class Game {
 
             while (q.length) {
                 const cur = q.shift();
-                const cy = Math.floor(cur / MAP_W);
-                const cx = cur % MAP_W;
+                const cy = Math.floor(cur / this.mapW);
+                const cx = cur % this.mapW;
                 for (const [dx, dy] of dirs) {
                     const nx = cx + dx, ny = cy + dy;
-                    if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
+                    if (nx < 0 || nx >= this.mapW || ny < 0 || ny >= this.mapH) continue;
                     const ni = idx(nx, ny);
                     if (visited[ni]) continue;
                     if (!walkable(ni)) continue;
@@ -420,7 +427,7 @@ class Game {
         let tries = 0;
         while (this.portalCells.length < portalCount && tries < 2000) {
             tries++;
-            const i = Math.floor(Math.random() * SIZE);
+            const i = Math.floor(Math.random() * this.size);
             const t = this.types[i];
             if (t === 'mountain' || t === 'wall' || t === 'general' || t === 'city') continue;
             if (this.portalCells.includes(i)) continue;
@@ -443,7 +450,7 @@ class Game {
             this.updateTickInterval();
         }
 
-        for (let i = 0; i < SIZE; i++) {
+        for (let i = 0; i < this.size; i++) {
             const owner = this.owners[i];
             if (owner === -1) continue;
 
@@ -599,9 +606,9 @@ class Game {
     move(pid, from, to, half) {
         if (this.status !== 'playing') return;
 
-        const fi = from.y * MAP_W + from.x;
-        const ti = to.y * MAP_W + to.x;
-        if (fi < 0 || fi >= SIZE || ti < 0 || ti >= SIZE) return;
+        const fi = from.y * this.mapW + from.x;
+        const ti = to.y * this.mapW + to.x;
+        if (fi < 0 || fi >= this.size || ti < 0 || ti >= this.size) return;
         if (Math.abs(from.x - to.x) + Math.abs(from.y - to.y) !== 1) return;
         if (this.owners[fi] !== pid || this.armies[fi] <= 1) return;
 
@@ -643,7 +650,7 @@ class Game {
         let isDead = true;
         // 城堡模式下，还有城市即未死亡
         if (this.settings.gameMode === 'castle') {
-            for (let i = 0; i < SIZE; i++) {
+            for (let i = 0; i < this.size; i++) {
                 if (this.owners[i] === victimIdx && this.types[i] === 'city') {
                     isDead = false;
                     break;
@@ -654,7 +661,7 @@ class Game {
         if (isDead) {
             p.dead = true;
             // 将死者的领地转交给击杀者，兵力减半
-            for (let i = 0; i < SIZE; i++) {
+            for (let i = 0; i < this.size; i++) {
                 if (this.owners[i] === victimIdx) {
                     this.owners[i] = killerIdx;
                     this.armies[i] = Math.ceil(this.armies[i] / 2);
@@ -693,7 +700,7 @@ class Game {
     getScores() {
         return this.players.map(p => {
             let army = 0, land = 0;
-            for (let i = 0; i < SIZE; i++) {
+            for (let i = 0; i < this.size; i++) {
                 if (this.owners[i] === p.index) {
                     army += this.armies[i];
                     land++;
@@ -704,13 +711,13 @@ class Game {
     }
 
     kickPlayer(idx) {
-    const pl = this.players[idx];
-    if (pl) {
-        io.to(pl.socketId).emit('kicked');
-        this.removePlayer(pl.socketId);
-        this.broadcastLobby();
+        const pl = this.players[idx];
+        if (pl) {
+            io.to(pl.socketId).emit('kicked');
+            this.removePlayer(pl.socketId);
+            this.broadcastLobby();
+        }
     }
-}
 
     broadcastLobby() {
         const list = this.players.map(p => ({
@@ -736,7 +743,27 @@ class Game {
         if (ns.growthPeriod != null) ns.growthPeriod = Math.max(1, Math.floor(Number(ns.growthPeriod) || 25));
         if (ns.growthLambda != null) ns.growthLambda = Math.max(0, Number(ns.growthLambda) || 1);
 
+        // 地图尺寸设置 (仅在等待状态可修改)
+        if (ns.mapWidth != null) ns.mapWidth = Math.max(10, Math.min(50, Math.floor(Number(ns.mapWidth) || 20)));
+        if (ns.mapHeight != null) ns.mapHeight = Math.max(10, Math.min(50, Math.floor(Number(ns.mapHeight) || 20)));
+
         this.settings = { ...this.settings, ...ns };
+
+        // 在等待状态下，如果地图尺寸改变，重新分配数组
+        if (this.status === 'waiting') {
+            const newW = this.settings.mapWidth;
+            const newH = this.settings.mapHeight;
+            if (newW !== this.mapW || newH !== this.mapH) {
+                this.mapW = newW;
+                this.mapH = newH;
+                this.size = newW * newH;
+                this.types  = new Array(this.size).fill('land');
+                this.armies = new Int32Array(this.size).fill(0);
+                this.owners = new Int8Array(this.size).fill(-1);
+                this.vis = null;
+                this.lastViews.clear();
+            }
+        }
 
         if (this.status === 'playing' && (ns.speed != null || ns.bloodMoonTurn != null)) {
             this.updateTickInterval();
@@ -750,28 +777,28 @@ class Game {
         if (pCount === 0) return;
 
         // 1. 计算全局视野 (Optimization: 复用 Int8Array 减少 GC)
-        if (!this.vis || this.vis.length !== SIZE * pCount) {
-            this.vis = new Int8Array(SIZE * pCount);
+        if (!this.vis || this.vis.length !== this.size * pCount) {
+            this.vis = new Int8Array(this.size * pCount);
         }
         this.vis.fill(0);
         const vis = this.vis;
 
-        for (let i = 0; i < SIZE; i++) {
+        for (let i = 0; i < this.size; i++) {
             const owner = this.owners[i];
             if (owner === -1) continue;
 
             const type = this.types[i];
             const range = (type === 'tower') ? 5 : 1;
-            const y = Math.floor(i / MAP_W);
-            const x = i % MAP_W;
-            const base = owner * SIZE;
+            const y = Math.floor(i / this.mapW);
+            const x = i % this.mapW;
+            const base = owner * this.size;
 
             for (let dy = -range; dy <= range; dy++) {
                 for (let dx = -range; dx <= range; dx++) {
                     // if (Math.abs(dx) + Math.abs(dy) > range) continue; // 不采用菱形视野
                     const nx = x + dx, ny = y + dy;
-                    if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
-                    const ni = ny * MAP_W + nx;
+                    if (nx < 0 || nx >= this.mapW || ny < 0 || ny >= this.mapH) continue;
+                    const ni = ny * this.mapW + nx;
                     vis[base + ni] = 1;
                 }
             }
@@ -781,7 +808,7 @@ class Game {
 
         // 2. 为每个玩家计算可见性与迷雾
         this.players.forEach(p => {
-            const offset = p.index * SIZE;
+            const offset = p.index * this.size;
             let view = this.lastViews.get(p.socketId);
             if (!view) {
                 view = this.createEmptyView();
@@ -792,13 +819,13 @@ class Game {
             const changes = [];
             let armiesFull, ownersFull, typesFull, fogsFull;
             if (isInitial) {
-                armiesFull = new Array(SIZE);
-                ownersFull = new Array(SIZE);
-                typesFull  = new Array(SIZE);
-                fogsFull   = new Array(SIZE);
+                armiesFull = new Array(this.size);
+                ownersFull = new Array(this.size);
+                typesFull  = new Array(this.size);
+                fogsFull   = new Array(this.size);
             }
 
-            for (let i = 0; i < SIZE; i++) {
+            for (let i = 0; i < this.size; i++) {
                 const realType = this.types[i];
                 let a, o, t, f;
 
@@ -856,14 +883,14 @@ class Game {
                 me: p.index,
                 bloodMoon: this.bloodMoonActive
             };
-            
+
             if (isInitial) {
                 payload.full   = true;
                 payload.armies = armiesFull;
                 payload.owners = ownersFull;
                 payload.types  = typesFull;
                 payload.fogs   = fogsFull;
-                
+
                 io.to(p.socketId).compress(false).emit('game_tick', payload);
             } else {
                 payload.changes = changes;
@@ -879,13 +906,13 @@ const game = new Game('global');
 // Socket.io 事件处理
 // ==========================================
 io.on('connection', (socket) => {
-    
+
     // 注册接口：写入 SQLite 数据库
     socket.on('register', async ({ username, password }) => {
         if (!username || !password) {
             return socket.emit('msg', { type: 'error', text: '请输入账号密码' });
         }
-        
+
         try {
             // 注意：生产环境应使用 bcrypt 对密码进行哈希处理，此处为演示直接存储
             await dbRun('INSERT INTO users (username, password) VALUES (?, ?)', [username, password]);
@@ -905,10 +932,10 @@ io.on('connection', (socket) => {
         if (!username || !password) {
             return socket.emit('msg', { type: 'error', text: '请输入账号密码' });
         }
-        
+
         try {
             const row = await dbGet('SELECT * FROM users WHERE username = ?', [username]);
-            
+
             if (!row) {
                 return socket.emit('msg', { type: 'error', text: '用户不存在' });
             }
@@ -919,7 +946,7 @@ io.on('connection', (socket) => {
             socket.data.username = username;
             socket.emit('login_success', { username, wins: row.wins });
             socket.emit('msg', { type: 'success', text: `欢迎回来, ${username}` });
-            
+
         } catch (err) {
             console.error('Login Error:', err);
             socket.emit('msg', { type: 'error', text: '登录失败：数据库错误' });

@@ -33,400 +33,455 @@
     </style>
 </head>
 <body>
-    <div id="toast-container"></div>
+<div id="toast-container"></div>
 
-    <!-- 顶部 UI -->
-    <div id="ui-layer">
-        <div class="top-bar-item">
-            <span id="user-info">未登录</span>
-            <button id="btn-restart-game" style="display:none;" onclick="hostRestart()">重置</button>
-        </div>
-        <div class="top-bar-item">
-            Turn: <span id="turn-count">0</span>
-        </div>
-        <div class="top-bar-item">
-            <span id="blood-moon-indicator">血月</span>
-        </div>
+<!-- 顶部 UI -->
+<div id="ui-layer">
+    <div class="top-bar-item">
+        <span id="user-info">未登录</span>
+        <button id="btn-restart-game" style="display:none;" onclick="hostRestart()">重置</button>
     </div>
+    <div class="top-bar-item">
+        Turn: <span id="turn-count">0</span>
+    </div>
+    <div class="top-bar-item">
+        <span id="blood-moon-indicator">血月</span>
+    </div>
+</div>
 
-    <!-- 游戏区域 -->
-    <div id="game-container">
-        <div id="grid"></div>
-        
-        <!-- 大厅遮罩 -->
-        <div id="lobby-overlay">
-            <div class="lobby-card">
-                <div class="lobby-header">
-                    <h1>Generals Pro</h1>
-                </div>
-                
-                <!-- 登录 -->
-                <div id="auth-section">
-                    <div class="input-group">
-                        <input type="text" id="inp-user" placeholder="账号(唯一)" maxlength="12">
-                        <input type="password" id="inp-pass" placeholder="密码">
-                    </div>
-                    <div class="btn-group">
-                        <button class="action-btn btn-primary" onclick="doLogin()">登录</button>
-                        <button class="action-btn" style="background:#444" onclick="doRegister()">注册</button>
-                    </div>
-                </div>
+<!-- 游戏区域 -->
+<div id="game-container">
+    <div id="grid"></div>
 
-                <!-- 进入房间 -->
-                <div id="join-section" style="display:none; padding:20px; text-align:center">
-                    <h2 id="welcome-msg" style="color:#aaa; margin-bottom:10px"></h2>
-                    <div style="margin-bottom:15px;">
-                        <input id="inp-nickname" type="text" maxlength="12"
-                               placeholder="游戏内昵称(可选)"
-                               style="padding:8px 10px;background:#333;border:1px solid #444;color:#eee;border-radius:4px;width:70%;">
-                    </div>
-                    <button class="action-btn btn-primary" onclick="joinGame()">加入游戏</button>
-                </div>
+    <!-- 大厅遮罩 -->
+    <div id="lobby-overlay">
+        <div class="lobby-card">
+            <div class="lobby-header">
+                <h1>Generals Pro</h1>
+            </div>
 
-                <!-- 房间大厅 -->
-                <div id="lobby-status" style="display:none;">
-                    <div class="lobby-content">
-                        <!-- 左：玩家列表 -->
-                        <div class="col-left">
-                            <h3 class="panel-title">
-                                玩家列表 (<span id="count-txt">0/0</span>)
-                            </h3>
-                            <ul id="player-list"></ul>
+            <!-- 登录 -->
+            <div id="auth-section">
+                <div class="input-group">
+                    <input type="text" id="inp-user" placeholder="账号(唯一)" maxlength="12">
+                    <input type="password" id="inp-pass" placeholder="密码">
+                </div>
+                <div class="btn-group">
+                    <button class="action-btn btn-primary" onclick="doLogin()">登录</button>
+                    <button class="action-btn" style="background:#444" onclick="doRegister()">注册</button>
+                </div>
+            </div>
+
+            <!-- 进入房间 -->
+            <div id="join-section" style="display:none; padding:20px; text-align:center">
+                <h2 id="welcome-msg" style="color:#aaa; margin-bottom:10px"></h2>
+                <div style="margin-bottom:15px;">
+                    <input id="inp-nickname" type="text" maxlength="12"
+                           placeholder="游戏内昵称(可选)"
+                           style="padding:8px 10px;background:#333;border:1px solid #444;color:#eee;border-radius:4px;width:70%;">
+                </div>
+                <button class="action-btn btn-primary" onclick="joinGame()">加入游戏</button>
+            </div>
+
+            <!-- 房间大厅 -->
+            <div id="lobby-status" style="display:none;">
+                <div class="lobby-content">
+                    <!-- 左：玩家列表 -->
+                    <div class="col-left">
+                        <h3 class="panel-title">
+                            玩家列表 (<span id="count-txt">0/0</span>)
+                        </h3>
+                        <ul id="player-list"></ul>
+                    </div>
+
+                    <!-- 右：设置面板 -->
+                    <div class="col-right">
+                        <h3 class="panel-title">设置 👑</h3>
+
+                        <div class="setting-row">
+                            <label>速度(s/回合):</label>
+                            <input type="number" id="set-speed" step="0.1" min="0.1" value="0.5">
                         </div>
 
-                        <!-- 右：设置面板 -->
-                        <div class="col-right">
-                            <h3 class="panel-title">设置 👑</h3>
-
-                            <div class="setting-row">
-                                <label>速度(s/回合):</label>
-                                <input type="number" id="set-speed" step="0.1" min="0.1" value="0.5">
-                            </div>
-
-                            <div class="setting-row">
-                                <label>地图:</label>
-                                <select id="set-map">
-                                    <option value="classic">经典</option>
-                                    <option value="pro" selected>豪华</option>
-                                </select>
-                            </div>
-
-                            <div class="setting-row">
-                                <label>模式:</label>
-                                <select id="set-rule">
-                                    <option value="normal">普通</option>
-                                    <option value="castle">生存(城堡/将军任一存活)</option>
-                                </select>
-                            </div>
-
-                            <div class="setting-row">
-                                <label>将军间距:</label>
-                                <input type="number" id="set-dist" value="16" min="4" max="30">
-                            </div>
-
-                            <hr style="border-color:#333;margin:10px 0;">
-
-                            <!-- 新增选项：占领阈值 -->
-                            <div class="setting-row">
-                                <label>占领阈值:</label>
-                                <input type="number" id="set-capthr" value="0" min="0" max="999">
-                            </div>
-
-                            <!-- 海洋参数 -->
-                            <div class="setting-row">
-                                <label>海洋密度:</label>
-                                <input type="number" id="set-ocean-ratio" value="0.15" step="0.05" min="0" max="0.9">
-                            </div>
-
-                            <!-- 传送门数量 -->
-                            <div class="setting-row">
-                                <label>传送门数量:</label>
-                                <input type="number" id="set-portals" value="2" min="0" max="10">
-                            </div>
-
-                            <!-- 血月 -->
-                            <div class="setting-row">
-                                <label>血月回合:</label>
-                                <input type="number" id="set-blood-turn" value="200" min="0">
-                            </div>
-
-                            <!-- 随机增长 -->
-                            <div class="setting-row">
-                                <label>增长模式:</label>
-                                <select id="set-growth-mode">
-                                    <option value="fixed">固定 +1/周期</option>
-                                    <option value="poisson" selected>泊松(期望=1)</option>
-                                </select>
-                            </div>
-
-                            <div class="setting-row">
-                                <label>周期长度:</label>
-                                <input type="number" id="set-growth-period" value="25" min="1">
-                            </div>
-
-                            <div class="setting-row">
-                                <label>泊松 λ:</label>
-                                <input type="number" id="set-growth-lambda" value="1" step="0.1" min="0">
-                            </div>
-
+                        <div class="setting-row">
+                            <label>地图:</label>
+                            <select id="set-map">
+                                <option value="classic">经典</option>
+                                <option value="pro" selected>豪华</option>
+                            </select>
                         </div>
-                    </div>
 
-                    <div class="lobby-footer">
-                        <button id="btn-ready" class="action-btn btn-ready" onclick="toggleReady()">准备</button>
+                        <div class="setting-row">
+                            <label>模式:</label>
+                            <select id="set-rule">
+                                <option value="normal">普通</option>
+                                <option value="castle">生存(城堡/将军任一存活)</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <label>将军间距:</label>
+                            <input type="number" id="set-dist" value="16" min="4" max="30">
+                        </div>
+
+                        <hr style="border-color:#333;margin:10px 0;">
+
+                        <!-- 地图尺寸 -->
+                        <div class="setting-row">
+                            <label>地图宽度:</label>
+                            <input type="number" id="set-map-width" value="20" min="10" max="50">
+                        </div>
+
+                        <div class="setting-row">
+                            <label>地图高度:</label>
+                            <input type="number" id="set-map-height" value="20" min="10" max="50">
+                        </div>
+
+                        <hr style="border-color:#333;margin:10px 0;">
+
+                        <!-- 新增选项：占领阈值 -->
+                        <div class="setting-row">
+                            <label>占领阈值:</label>
+                            <input type="number" id="set-capthr" value="0" min="0" max="999">
+                        </div>
+
+                        <!-- 海洋参数 -->
+                        <div class="setting-row">
+                            <label>海洋密度:</label>
+                            <input type="number" id="set-ocean-ratio" value="0.15" step="0.05" min="0" max="0.9">
+                        </div>
+
+                        <!-- 传送门数量 -->
+                        <div class="setting-row">
+                            <label>传送门数量:</label>
+                            <input type="number" id="set-portals" value="2" min="0" max="10">
+                        </div>
+
+                        <!-- 血月 -->
+                        <div class="setting-row">
+                            <label>血月回合:</label>
+                            <input type="number" id="set-blood-turn" value="200" min="0">
+                        </div>
+
+                        <!-- 随机增长 -->
+                        <div class="setting-row">
+                            <label>增长模式:</label>
+                            <select id="set-growth-mode">
+                                <option value="fixed">固定 +1/周期</option>
+                                <option value="poisson" selected>泊松(期望=1)</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <label>周期长度:</label>
+                            <input type="number" id="set-growth-period" value="25" min="1">
+                        </div>
+
+                        <div class="setting-row">
+                            <label>泊松 λ:</label>
+                            <input type="number" id="set-growth-lambda" value="1" step="0.1" min="0">
+                        </div>
+
                     </div>
+                </div>
+
+                <div class="lobby-footer">
+                    <button id="btn-ready" class="action-btn btn-ready" onclick="toggleReady()">准备</button>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- 计分板 -->
-    <div id="leaderboard" style="position:absolute;top:60px;right:20px;background:rgba(0,0,0,0.6);padding:10px;border-radius:5px;pointer-events:none;"></div>
+</div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
+<!-- 计分板 -->
+<div id="leaderboard" style="position:absolute;top:60px;right:20px;background:rgba(0,0,0,0.6);padding:10px;border-radius:5px;pointer-events:none;"></div>
 
-        // ===== 常量与状态 =====
-        const MAP_W = 20, MAP_H = 20;
-        const SIZE = MAP_W * MAP_H;
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
 
-        const ui = {
-            auth: document.getElementById('auth-section'),
-            join: document.getElementById('join-section'),
-            lobby: document.getElementById('lobby-status'),
-            overlay: document.getElementById('lobby-overlay'),
-            pList: document.getElementById('player-list'),
-            btnReady: document.getElementById('btn-ready'),
-            btnRestart: document.getElementById('btn-restart-game'),
-            user: document.getElementById('inp-user'),
-            pass: document.getElementById('inp-pass'),
-            nickname: document.getElementById('inp-nickname'),
-            // 基础设置
-            sSpeed: document.getElementById('set-speed'),
-            sMap: document.getElementById('set-map'),
-            sRule: document.getElementById('set-rule'),
-            sDist: document.getElementById('set-dist'),
-            // 新增设置
-            sCapThr: document.getElementById('set-capthr'),
-            sOceanRatio: document.getElementById('set-ocean-ratio'),
-            sPortals: document.getElementById('set-portals'),
-            sBloodTurn: document.getElementById('set-blood-turn'),
-            sGrowthMode: document.getElementById('set-growth-mode'),
-            sGrowthPeriod: document.getElementById('set-growth-period'),
-            sGrowthLambda: document.getElementById('set-growth-lambda')
+    // ===== 常量与状态 =====
+    let MAP_W = 20, MAP_H = 20;
+    let SIZE = MAP_W * MAP_H;
+
+    const ui = {
+        auth: document.getElementById('auth-section'),
+        join: document.getElementById('join-section'),
+        lobby: document.getElementById('lobby-status'),
+        overlay: document.getElementById('lobby-overlay'),
+        pList: document.getElementById('player-list'),
+        btnReady: document.getElementById('btn-ready'),
+        btnRestart: document.getElementById('btn-restart-game'),
+        user: document.getElementById('inp-user'),
+        pass: document.getElementById('inp-pass'),
+        nickname: document.getElementById('inp-nickname'),
+        // 基础设置
+        sSpeed: document.getElementById('set-speed'),
+        sMap: document.getElementById('set-map'),
+        sRule: document.getElementById('set-rule'),
+        sDist: document.getElementById('set-dist'),
+        // 新增设置
+        sCapThr: document.getElementById('set-capthr'),
+        sOceanRatio: document.getElementById('set-ocean-ratio'),
+        sPortals: document.getElementById('set-portals'),
+        sBloodTurn: document.getElementById('set-blood-turn'),
+        sGrowthMode: document.getElementById('set-growth-mode'),
+        sGrowthPeriod: document.getElementById('set-growth-period'),
+        sGrowthLambda: document.getElementById('set-growth-lambda'),
+        // 地图尺寸
+        sMapWidth: document.getElementById('set-map-width'),
+        sMapHeight: document.getElementById('set-map-height')
+    };
+
+    const bloodIndicator = document.getElementById('blood-moon-indicator');
+
+    let cellCache = [];
+    let cellState = new Array(SIZE);
+    let selected = { x: -1, y: -1 };
+    let isHost = false;
+    let isInLobby = true;
+    let isHalf = false;
+    let myIndex = -1; // 记录光标索引
+    let myGeneralIndex = -1; // 记录将军的位置
+    let lastBoardHtml = '';
+    const shortcuts = new Map(); // 存储快捷键:
+    let isCtrl = false;          // 是否按住 Ctrl
+    let isSpectator = false;     // CapsLock
+
+
+    function makeDefaultCellState() {
+        return {
+            army: 0,
+            owner: -1,
+            type: 'unknown',
+            fog: true,
+            sel: false
         };
+    }
 
-        const bloodIndicator = document.getElementById('blood-moon-indicator');
+    function renderCell(idx) {
+        const st = cellState[idx];
+        const el = cellCache[idx];
+        if (!el || !st) return;
 
-        let cellCache = [];
-        let cellState = new Array(SIZE);
-        let selected = { x: -1, y: -1 };
-        let isHost = false;
-        let isInLobby = true;
-        let isHalf = false;
-        let myIndex = -1; // 记录光标索引
-        let myGeneralIndex = -1; // 记录将军的位置
-        let lastBoardHtml = '';
-        const shortcuts = new Map(); // 存储快捷键:
-        let isCtrl = false;          // 是否按住 Ctrl
-        let isSpectator = false;     // CapsLock
-        
+        // 提取状态
+        let { type, owner, fog, army, sel } = st;
 
-        function makeDefaultCellState() {
-            return {
-                army: 0,
-                owner: -1,
-                type: 'unknown',
-                fog: true,
-                sel: false
-            };
-        }
+        // 1. 生成 Class 列表
+        let classes = ['cell'];
 
-        function renderCell(idx) {
-            const st = cellState[idx];
-            const el = cellCache[idx];
-            if (!el || !st) return;
-            
-            // 提取状态
-            let { type, owner, fog, army, sel } = st;
+        if (fog) {
+            // === 迷雾模式 ===
+            classes.push('fog');
 
-            // 1. 生成 Class 列表
-            let classes = ['cell'];
+            // 在迷雾里，不加具体类型类名
+            // 障碍物:'fog-obstacle'
+            const obstacles = ['mountain', 'city', 'wall', 'tower', 'portal', 'general'];
 
-            if (fog) {
-                // === 迷雾模式 ===
-                classes.push('fog');
-
-                // 在迷雾里，不加具体类型类名
-                // 障碍物:'fog-obstacle'
-                const obstacles = ['mountain', 'city', 'wall', 'tower', 'portal', 'general'];
-                
-                // 障碍物 -> 'fog-obstacle'
-                if (obstacles.includes(type)) {
-                    classes.push('fog-obstacle');
-                } else {
-                    // 剩下的就是平地/沼泽/未知
-                    if (type === 'unknown') classes.push('unknown');
-                    // 平地在迷雾里不加任何特殊类，就用默认 fog 样式
-                }
-
-                if (owner !== -1) {
-                     // classes.push('owner-' + owner); // 如果想让迷雾里也能看到己方颜色
-                }
-
+            // 障碍物 -> 'fog-obstacle'
+            if (obstacles.includes(type)) {
+                classes.push('fog-obstacle');
             } else {
-                // === 可见模式 (保持原样) ===
-                if (type !== 'unknown') {
-                    if (type === 'land') {
-                        // 如果是平地：没人占的时候才加 'land' 类
-                        if (owner === -1) {
-                            classes.push('land');
-                        }
-                    } else {
-                        // 其他正常添加
-                        classes.push(type);
+                // 剩下的就是平地/沼泽/未知
+                if (type === 'unknown') classes.push('unknown');
+                // 平地在迷雾里不加任何特殊类，就用默认 fog 样式
+            }
+
+            if (owner !== -1) {
+                // classes.push('owner-' + owner); // 如果想让迷雾里也能看到己方颜色
+            }
+
+        } else {
+            // === 可见模式 (保持原样) ===
+            if (type !== 'unknown') {
+                if (type === 'land') {
+                    // 如果是平地：没人占的时候才加 'land' 类
+                    if (owner === -1) {
+                        classes.push('land');
                     }
-                }
-
-                if (owner !== -1) {
-                    classes.push('owner-' + owner);
-                }
-            }
-
-            // 选中状态
-            if (sel) classes.push('selected');
-
-            el.className = classes.join(' ');
-
-            // 2. 内容渲染
-            let txt = '';
-            el.style.fontSize = '';
-
-            if (!fog) {
-                // 可见时
-                if (type === 'wall' && owner === -1) {
-                    txt = army;
-                    el.style.fontSize = '10px';
-                } else if (type !== 'mountain' && type !== 'unknown' && army > 0) {
-                    txt = army;
-                }
-            } else {
-                // 不显示文字
-            }
-
-            // 快捷键数字 (左上角)
-            for (const [key, val] of shortcuts.entries()) {
-                if (val === idx) {
-                    txt += `<div class="shortcut-label">${key}</div>`;
-                    break; // 一个格子只显示一个快捷键
+                } else {
+                    // 其他正常添加
+                    classes.push(type);
                 }
             }
 
-            el.innerHTML = txt;
+            if (owner !== -1) {
+                classes.push('owner-' + owner);
+            }
         }
 
+        // 选中状态
+        if (sel) classes.push('selected');
+
+        el.className = classes.join(' ');
+
+        // 2. 内容渲染
+        let txt = '';
+        el.style.fontSize = '';
+
+        if (!fog) {
+            // 可见时
+            if (type === 'wall' && owner === -1) {
+                txt = army;
+                el.style.fontSize = '10px';
+            } else if (type !== 'mountain' && type !== 'unknown' && army > 0) {
+                txt = army;
+            }
+        } else {
+            // 不显示文字
+        }
+
+        // 快捷键数字 (左上角)
+        for (const [key, val] of shortcuts.entries()) {
+            if (val === idx) {
+                txt += `<div class="shortcut-label">${key}</div>`;
+                break; // 一个格子只显示一个快捷键
+            }
+        }
+
+        el.innerHTML = txt;
+    }
 
 
-        function initGrid() {
-            const grid = document.getElementById('grid');
-            grid.innerHTML = '';
-            cellCache = [];
 
-            for (let y = 0; y < MAP_H; y++) {
-                for (let x = 0; x < MAP_W; x++) {
-                    const div = document.createElement('div');
-                    div.className = 'cell unknown';
-                    div.dataset.x = x;
-                    div.dataset.y = y;
-                    div.onclick = () => selectCell(x, y);
-                    grid.appendChild(div);
-                    cellCache.push(div);
+    function initGrid(newW, newH) {
+        // 如果传入了新尺寸，更新全局变量
+        if (newW && newH) {
+            MAP_W = newW;
+            MAP_H = newH;
+            SIZE = MAP_W * MAP_H;
+        }
+
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        cellCache = [];
+        cellState = new Array(SIZE);
+
+        // 计算合适的格子大小以适应屏幕
+        const container = document.getElementById('game-container');
+        const maxGridW = container.clientWidth - 40;  // 留出边距
+        const maxGridH = container.clientHeight - 40;
+
+        // 计算单个格子的最大尺寸 (包含1px间隙)
+        const cellW = Math.floor(maxGridW / MAP_W) - 1;
+        const cellH = Math.floor(maxGridH / MAP_H) - 1;
+        const cellSize = Math.max(16, Math.min(48, Math.min(cellW, cellH))); // 限制在16-48px之间
+
+        // 动态设置grid样式
+        grid.style.gridTemplateColumns = `repeat(${MAP_W}, ${cellSize}px)`;
+        grid.style.gridTemplateRows = `repeat(${MAP_H}, ${cellSize}px)`;
+
+        // 动态设置格子样式
+        const styleId = 'dynamic-cell-style';
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = `
+                #grid .cell {
+                    width: ${cellSize}px;
+                    height: ${cellSize}px;
+                    font-size: ${Math.max(10, Math.floor(cellSize * 0.4))}px;
                 }
-            }
+            `;
 
-            for (let i = 0; i < SIZE; i++) {
-                cellState[i] = makeDefaultCellState();
-                renderCell(i);
+        for (let y = 0; y < MAP_H; y++) {
+            for (let x = 0; x < MAP_W; x++) {
+                const div = document.createElement('div');
+                div.className = 'cell unknown';
+                div.dataset.x = x;
+                div.dataset.y = y;
+                div.onclick = () => selectCell(x, y);
+                grid.appendChild(div);
+                cellCache.push(div);
             }
-
-            lastBoardHtml = '';
-            document.getElementById('leaderboard').innerHTML = '';
-            if (bloodIndicator) bloodIndicator.classList.remove('active');
         }
 
-        initGrid();
-
-        // ===== Toast =====
-        function showToast(msg, type='info') {
-            const t = document.createElement('div');
-            t.className = `toast ${type}`;
-            t.innerText = msg;
-            document.getElementById('toast-container').appendChild(t);
-            setTimeout(() => t.remove(), 3000);
+        for (let i = 0; i < SIZE; i++) {
+            cellState[i] = makeDefaultCellState();
+            renderCell(i);
         }
 
-        // ===== 选择逻辑 =====
-        function clearSelection() {
-            if (selected.x !== -1 && selected.y !== -1) {
-                const idx = selected.y * MAP_W + selected.x;
-                if (cellState[idx]) {
-                    cellState[idx].sel = false;
-                    renderCell(idx);
-                }
-            }
-            selected = { x: -1, y: -1 };
-        }
+        lastBoardHtml = '';
+        shortcuts.clear(); // 清除快捷键绑定
+        document.getElementById('leaderboard').innerHTML = '';
+        if (bloodIndicator) bloodIndicator.classList.remove('active');
+    }
 
-        function selectCell(x, y) {
-            if (isInLobby) return;
-            clearSelection();
-            selected = { x, y };
-            const idx = y * MAP_W + x;
+    initGrid();
+
+    // ===== Toast =====
+    function showToast(msg, type='info') {
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.innerText = msg;
+        document.getElementById('toast-container').appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+
+    // ===== 选择逻辑 =====
+    function clearSelection() {
+        if (selected.x !== -1 && selected.y !== -1) {
+            const idx = selected.y * MAP_W + selected.x;
             if (cellState[idx]) {
-                cellState[idx].sel = true;
+                cellState[idx].sel = false;
                 renderCell(idx);
             }
         }
+        selected = { x: -1, y: -1 };
+    }
 
-        // ===== Socket 事件 =====
-        socket.on('msg', (data) => {
-            if (typeof data === 'object') showToast(data.text, data.type);
-            else showToast(data, 'info');
-        });
+    function selectCell(x, y) {
+        if (isInLobby) return;
+        clearSelection();
+        selected = { x, y };
+        const idx = y * MAP_W + x;
+        if (cellState[idx]) {
+            cellState[idx].sel = true;
+            renderCell(idx);
+        }
+    }
 
-        socket.on('login_success', d => {
-            ui.auth.style.display = 'none';
-            ui.join.style.display = 'block';
-            document.getElementById('user-info').innerText = d.username;
-            document.getElementById('welcome-msg').innerText = `欢迎, ${d.username}`;
-        });
+    // ===== Socket 事件 =====
+    socket.on('msg', (data) => {
+        if (typeof data === 'object') showToast(data.text, data.type);
+        else showToast(data, 'info');
+    });
 
-        socket.on('joined_success', () => {
-            ui.join.style.display = 'none';
-            ui.lobby.style.display = 'block';
-        });
+    socket.on('login_success', d => {
+        ui.auth.style.display = 'none';
+        ui.join.style.display = 'block';
+        document.getElementById('user-info').innerText = d.username;
+        document.getElementById('welcome-msg').innerText = `欢迎, ${d.username}`;
+    });
 
-        socket.on('kicked', () => {
-            alert('你被踢出了房间');
-            location.reload();
-        });
+    socket.on('joined_success', () => {
+        ui.join.style.display = 'none';
+        ui.lobby.style.display = 'block';
+    });
 
-        socket.on('lobby_update', ({ players, settings }) => {
-            if (isInLobby) ui.overlay.style.display = 'flex';
+    socket.on('kicked', () => {
+        alert('你被踢出了房间');
+        location.reload();
+    });
 
-            const me = players.find(p => p.id === socket.id);
-            // if (me) isHost = me.isHost;
-            if (me) {
-                myIndex = me.index; // 赋值全局变量
-                isHost = me.isHost;
-                
-                // 更新按钮状态
-                ui.btnReady.innerText = me.isReady ? '取消' : '准备';
-                ui.btnReady.className = `action-btn ${me.isReady ? 'btn-cancel' : 'btn-ready'}`;
-            }
+    socket.on('lobby_update', ({ players, settings }) => {
+        if (isInLobby) ui.overlay.style.display = 'flex';
 
-            ui.pList.innerHTML = players.map(p => `
+        const me = players.find(p => p.id === socket.id);
+        // if (me) isHost = me.isHost;
+        if (me) {
+            myIndex = me.index; // 赋值全局变量
+            isHost = me.isHost;
+
+            // 更新按钮状态
+            ui.btnReady.innerText = me.isReady ? '取消' : '准备';
+            ui.btnReady.className = `action-btn ${me.isReady ? 'btn-cancel' : 'btn-ready'}`;
+        }
+
+        ui.pList.innerHTML = players.map(p => `
                 <li style="border-left-color:${p.color}">
                     <div class="p-info">
                         <span class="p-dot" style="background:${p.color}"></span>
@@ -437,419 +492,430 @@
                             ${p.isReady ? 'READY' : 'WAIT'}
                         </span>
                         ${(isHost && p.id !== socket.id)
-                            ? `<span class="kick-btn" onclick="kickPlayer(${p.index})">✕</span>`
-                            : ''}
+            ? `<span class="kick-btn" onclick="kickPlayer(${p.index})">✕</span>`
+            : ''}
                     </div>
                 </li>`).join('');
-            document.getElementById('count-txt').innerText = `${players.length}/6`;
+        document.getElementById('count-txt').innerText = `${players.length}/6`;
 
-            // 控制权
-            const hostOnlyControls = [
-                ui.sSpeed, ui.sMap, ui.sRule, ui.sDist,
-                ui.sCapThr, ui.sOceanRatio, ui.sPortals,
-                ui.sBloodTurn, ui.sGrowthMode, ui.sGrowthPeriod, ui.sGrowthLambda
-            ];
-            hostOnlyControls.forEach(e => e.disabled = !isHost);
+        // 控制权
+        const hostOnlyControls = [
+            ui.sSpeed, ui.sMap, ui.sRule, ui.sDist,
+            ui.sCapThr, ui.sOceanRatio, ui.sPortals,
+            ui.sBloodTurn, ui.sGrowthMode, ui.sGrowthPeriod, ui.sGrowthLambda,
+            ui.sMapWidth, ui.sMapHeight
+        ];
+        hostOnlyControls.forEach(e => e.disabled = !isHost);
 
-            // 同步设置到 UI（除非正在输入）
-            if (settings) {
-                if (document.activeElement !== ui.sSpeed && settings.speed != null) ui.sSpeed.value = settings.speed;
-                if (settings.mapType) ui.sMap.value = settings.mapType;
-                if (settings.gameMode) ui.sRule.value = settings.gameMode;
-                if (settings.minDist != null) ui.sDist.value = settings.minDist;
+        // 同步设置到 UI（除非正在输入）
+        if (settings) {
+            if (document.activeElement !== ui.sSpeed && settings.speed != null) ui.sSpeed.value = settings.speed;
+            if (settings.mapType) ui.sMap.value = settings.mapType;
+            if (settings.gameMode) ui.sRule.value = settings.gameMode;
+            if (settings.minDist != null) ui.sDist.value = settings.minDist;
 
-                if (document.activeElement !== ui.sCapThr && settings.captureThreshold != null) ui.sCapThr.value = settings.captureThreshold;
-                if (document.activeElement !== ui.sOceanRatio && settings.oceanRatio != null) ui.sOceanRatio.value = settings.oceanRatio;
-                if (document.activeElement !== ui.sPortals && settings.portalCount != null) ui.sPortals.value = settings.portalCount;
-                if (document.activeElement !== ui.sBloodTurn && settings.bloodMoonTurn != null) ui.sBloodTurn.value = settings.bloodMoonTurn;
-                if (settings.growthMode) ui.sGrowthMode.value = settings.growthMode;
-                if (document.activeElement !== ui.sGrowthPeriod && settings.growthPeriod != null) ui.sGrowthPeriod.value = settings.growthPeriod;
-                if (document.activeElement !== ui.sGrowthLambda && settings.growthLambda != null) ui.sGrowthLambda.value = settings.growthLambda;
-            }
+            if (document.activeElement !== ui.sCapThr && settings.captureThreshold != null) ui.sCapThr.value = settings.captureThreshold;
+            if (document.activeElement !== ui.sOceanRatio && settings.oceanRatio != null) ui.sOceanRatio.value = settings.oceanRatio;
+            if (document.activeElement !== ui.sPortals && settings.portalCount != null) ui.sPortals.value = settings.portalCount;
+            if (document.activeElement !== ui.sBloodTurn && settings.bloodMoonTurn != null) ui.sBloodTurn.value = settings.bloodMoonTurn;
+            if (settings.growthMode) ui.sGrowthMode.value = settings.growthMode;
+            if (document.activeElement !== ui.sGrowthPeriod && settings.growthPeriod != null) ui.sGrowthPeriod.value = settings.growthPeriod;
+            if (document.activeElement !== ui.sGrowthLambda && settings.growthLambda != null) ui.sGrowthLambda.value = settings.growthLambda;
 
-            if (me) {
-                ui.btnReady.innerText = me.isReady ? '取消' : '准备';
-                ui.btnReady.className = `action-btn ${me.isReady ? 'btn-cancel' : 'btn-ready'}`;
-            }
-            ui.btnRestart.style.display = isHost ? 'inline-block' : 'none';
-        });
+            // 地图尺寸
+            if (document.activeElement !== ui.sMapWidth && settings.mapWidth != null) ui.sMapWidth.value = settings.mapWidth;
+            if (document.activeElement !== ui.sMapHeight && settings.mapHeight != null) ui.sMapHeight.value = settings.mapHeight;
+        }
 
-        socket.on('game_start', () => {
-            isInLobby = false;
-            ui.overlay.style.display = 'none';
-            document.querySelector('.game-over-toast')?.remove();
-            clearSelection();
-            initGrid();
-        });
+        if (me) {
+            ui.btnReady.innerText = me.isReady ? '取消' : '准备';
+            ui.btnReady.className = `action-btn ${me.isReady ? 'btn-cancel' : 'btn-ready'}`;
+        }
+        ui.btnRestart.style.display = isHost ? 'inline-block' : 'none';
+    });
 
-        socket.on('game_reset', () => {
-            isInLobby = true;
-            ui.overlay.style.display = 'flex';
-            document.getElementById('turn-count').innerText = '0';
-            clearSelection();
-        });
+    socket.on('game_start', ({ settings }) => {
+        isInLobby = false;
+        ui.overlay.style.display = 'none';
+        document.querySelector('.game-over-toast')?.remove();
+        clearSelection();
+        // 使用服务器传来的地图尺寸初始化
+        const w = (settings && settings.mapWidth) || 20;
+        const h = (settings && settings.mapHeight) || 20;
+        initGrid(w, h);
+    });
 
-        socket.on('game_over', idx => {
-            const d = document.createElement('div');
-            d.className = 'game-over-toast';
-            d.innerHTML = idx === -1 ? 'GAME OVER' : `👑 WINNER 👑<br>P${idx + 1}`;
-            d.onclick = () => d.remove();
-            document.body.appendChild(d);
-        });
+    socket.on('game_reset', () => {
+        isInLobby = true;
+        ui.overlay.style.display = 'flex';
+        document.getElementById('turn-count').innerText = '0';
+        clearSelection();
+    });
 
-        // ==== 只增量同步变化格子：full + changes ====
-        socket.on('game_tick', (data) => {
-            // if (isInLobby) return;
-            if (typeof data.me === 'number') {
-                myIndex = data.me;
-            }
+    socket.on('game_over', idx => {
+        const d = document.createElement('div');
+        d.className = 'game-over-toast';
+        d.innerHTML = idx === -1 ? 'GAME OVER' : `👑 WINNER 👑<br>P${idx + 1}`;
+        d.onclick = () => d.remove();
+        document.body.appendChild(d);
+    });
 
-            document.getElementById('turn-count').innerText = data.turn;
+    // ==== 只增量同步变化格子：full + changes ====
+    socket.on('game_tick', (data) => {
+        // if (isInLobby) return;
+        if (typeof data.me === 'number') {
+            myIndex = data.me;
+        }
 
-            // 血月指示
-            if (bloodIndicator) {
-                if (data.bloodMoon) bloodIndicator.classList.add('active');
-                else bloodIndicator.classList.remove('active');
-            }
+        document.getElementById('turn-count').innerText = data.turn;
 
-            if (data.full) {
-                myGeneralIndex = -1;
-                const { armies, owners, types, fogs } = data;
-                for (let i = 0; i < SIZE; i++) {
-                    const st = cellState[i];
-                    st.army = armies[i];
-                    st.owner = owners[i];
-                    st.type = types[i];
-                    st.fog = fogs[i] === 1;
-                    if (st.owner === myIndex && st.type === 'general') {
-                        myGeneralIndex = i;
-                    }
-                    renderCell(i);
+        // 血月指示
+        if (bloodIndicator) {
+            if (data.bloodMoon) bloodIndicator.classList.add('active');
+            else bloodIndicator.classList.remove('active');
+        }
+
+        if (data.full) {
+            myGeneralIndex = -1;
+            const { armies, owners, types, fogs } = data;
+            for (let i = 0; i < SIZE; i++) {
+                const st = cellState[i];
+                st.army = armies[i];
+                st.owner = owners[i];
+                st.type = types[i];
+                st.fog = fogs[i] === 1;
+                if (st.owner === myIndex && st.type === 'general') {
+                    myGeneralIndex = i;
                 }
-            } else if (Array.isArray(data.changes)) {
-                for (const c of data.changes) {
-                    const i = c.i;
-                    const st = cellState[i];
-                    if (!st) continue;
-                    st.army = c.a;
-                    st.owner = c.o;
-                    st.type = c.t;
-                    st.fog = c.f === 1;
-                    renderCell(i);
-                }
+                renderCell(i);
             }
+        } else if (Array.isArray(data.changes)) {
+            for (const c of data.changes) {
+                const i = c.i;
+                const st = cellState[i];
+                if (!st) continue;
+                st.army = c.a;
+                st.owner = c.o;
+                st.type = c.t;
+                st.fog = c.f === 1;
+                renderCell(i);
+            }
+        }
 
-            // 计分板
-            if (Array.isArray(data.scores)) {
-                const scores = data.scores.slice().sort((a, b) => b.army - a.army);
-                const html = scores.map(s => `
+        // 计分板
+        if (Array.isArray(data.scores)) {
+            const scores = data.scores.slice().sort((a, b) => b.army - a.army);
+            const html = scores.map(s => `
                     <div style="display:flex;color:white;margin-bottom:5px;font-size:12px;${s.dead ? 'opacity:0.5;text-decoration:line-through' : ''}">
                         <span style="width:10px;height:10px;background:${s.color};margin-right:5px"></span>
                         <span style="flex:1">${s.name}</span>
                         <span>${s.army}</span>
                     </div>`).join('');
-                if (html !== lastBoardHtml) {
-                    lastBoardHtml = html;
-                    document.getElementById('leaderboard').innerHTML = html;
-                }
+            if (html !== lastBoardHtml) {
+                lastBoardHtml = html;
+                document.getElementById('leaderboard').innerHTML = html;
             }
-        });
+        }
+    });
 
-        // ===== 客户端预测逻辑 =====
-        function predictLocalMove(from, to, half) {
-            if (myIndex < 0) return;
+    // ===== 客户端预测逻辑 =====
+    function predictLocalMove(from, to, half) {
+        if (myIndex < 0) return;
 
-            const fi = from.y * MAP_W + from.x;
-            const ti = to.y * MAP_W + to.x;
-            if (fi < 0 || fi >= SIZE || ti < 0 || ti >= SIZE) return;
+        const fi = from.y * MAP_W + from.x;
+        const ti = to.y * MAP_W + to.x;
+        if (fi < 0 || fi >= SIZE || ti < 0 || ti >= SIZE) return;
 
-            const fromCell = cellState[fi];
-            const toCell = cellState[ti];
-            if (!fromCell || !toCell) return;
+        const fromCell = cellState[fi];
+        const toCell = cellState[ti];
+        if (!fromCell || !toCell) return;
 
-            // 基础校验
-            if (fromCell.owner !== myIndex) return;
-            if (fromCell.army <= 1) return;
-            if (fromCell.type === 'mountain') return;
-            if (toCell.type === 'mountain') return;
+        // 基础校验
+        if (fromCell.owner !== myIndex) return;
+        if (fromCell.army <= 1) return;
+        if (fromCell.type === 'mountain') return;
+        if (toCell.type === 'mountain') return;
 
-            // 计算兵力
-            let rawAmt = half ? Math.floor(fromCell.army / 2) : (fromCell.army - 1);
-            if (rawAmt <= 0) return;
+        // 计算兵力
+        let rawAmt = half ? Math.floor(fromCell.army / 2) : (fromCell.army - 1);
+        if (rawAmt <= 0) return;
 
-            let amt = rawAmt;
-            const fromType = fromCell.type;
-            const toType = toCell.type;
+        let amt = rawAmt;
+        const fromType = fromCell.type;
+        const toType = toCell.type;
 
-            // 海洋衰减模拟
-            if (fromType === 'ocean' && toType !== 'ocean' && toType !== 'mountain') {
-                amt = Math.floor(amt * 0.9);
-                if (amt <= 0) return;
-            }
+        // 海洋衰减模拟
+        if (fromType === 'ocean' && toType !== 'ocean' && toType !== 'mountain') {
+            amt = Math.floor(amt * 0.9);
+            if (amt <= 0) return;
+        }
 
-            // 占领阈值检查
-            const capVal = ui.sCapThr ? (Number(ui.sCapThr.value) || 0) : 0;
-            const isBuildingTarget = (toType === 'general' || toType === 'city' || toType === 'tower' || toType === 'wall');
-            if (isBuildingTarget && amt <= capVal) return;
+        // 占领阈值检查
+        const capVal = ui.sCapThr ? (Number(ui.sCapThr.value) || 0) : 0;
+        const isBuildingTarget = (toType === 'general' || toType === 'city' || toType === 'tower' || toType === 'wall');
+        if (isBuildingTarget && amt <= capVal) return;
 
-            // 1. 扣除起点兵力
-            fromCell.army -= rawAmt;
-            if (fromCell.army <= 0) {
-                fromCell.army = 0;
-                fromCell.owner = -1;
-            }
-            renderCell(fi);
+        // 1. 扣除起点兵力
+        fromCell.army -= rawAmt;
+        if (fromCell.army <= 0) {
+            fromCell.army = 0;
+            fromCell.owner = -1;
+        }
+        renderCell(fi);
 
-            // 2. 模拟终点战斗
-            let tOwner = toCell.owner;
-            let tArmy = toCell.army;
+        // 2. 模拟终点战斗
+        let tOwner = toCell.owner;
+        let tArmy = toCell.army;
 
-            if (tOwner === myIndex) {
-                // 己方合并
-                toCell.army = tArmy + amt;
+        if (tOwner === myIndex) {
+            // 己方合并
+            toCell.army = tArmy + amt;
+        } else {
+            // 战斗 / 占领
+            if (amt > tArmy) {
+                const rem = amt - tArmy;
+                toCell.owner = myIndex;
+                toCell.army = rem;
             } else {
-                // 战斗 / 占领
-                if (amt > tArmy) {
-                    const rem = amt - tArmy;
-                    toCell.owner = myIndex;
-                    toCell.army = rem;
-                } else {
-                    const rem = tArmy - amt;
-                    toCell.army = rem;
-                    if (rem <= 0) {
-                        toCell.army = 0;
-                        toCell.owner = -1;
-                    }
+                const rem = tArmy - amt;
+                toCell.army = rem;
+                if (rem <= 0) {
+                    toCell.army = 0;
+                    toCell.owner = -1;
                 }
             }
-            renderCell(ti);
         }
+        renderCell(ti);
+    }
 
-        // ===== 控制函数 =====
-        function doLogin() {
-            socket.emit('login', {
-                username: ui.user.value,
-                password: ui.pass.value
-            });
-        }
-
-        function doRegister() {
-            socket.emit('register', {
-                username: ui.user.value,
-                password: ui.pass.value
-            });
-        }
-
-        function joinGame() {
-            const nickname = ui.nickname.value.trim();
-            socket.emit('join', { nickname });
-        }
-
-        function toggleReady() {
-            socket.emit('toggle_ready');
-        }
-
-        function hostRestart() {
-            if (confirm('重置房间并清空游戏状态？')) {
-                socket.emit('host_restart');
-            }
-        }
-
-        function kickPlayer(i) {
-            if (confirm('确认踢出该玩家？')) {
-                socket.emit('host_kick', i);
-            }
-        }
-
-        function updateSettings() {
-            if (!isHost) return;
-
-            const numOr = (v, def) => {
-                const x = Number(v);
-                return Number.isFinite(x) ? x : def;
-            };
-
-            socket.emit('host_update_settings', {
-                speed: numOr(ui.sSpeed.value, 0.5),
-                mapType: ui.sMap.value,
-                gameMode: ui.sRule.value,
-                minDist: numOr(ui.sDist.value, 16),
-                captureThreshold: numOr(ui.sCapThr.value, 0),
-                oceanRatio: numOr(ui.sOceanRatio.value, 0.15),
-                portalCount: numOr(ui.sPortals.value, 2),
-                bloodMoonTurn: numOr(ui.sBloodTurn.value, 200),
-                growthMode: ui.sGrowthMode.value,
-                growthPeriod: numOr(ui.sGrowthPeriod.value, 25),
-                growthLambda: numOr(ui.sGrowthLambda.value, 1)
-            });
-        }
-
-        // 所有设置项变化都触发 updateSettings
-        [
-            ui.sSpeed, ui.sMap, ui.sRule, ui.sDist,
-            ui.sCapThr, ui.sOceanRatio, ui.sPortals,
-            ui.sBloodTurn, ui.sGrowthMode, ui.sGrowthPeriod, ui.sGrowthLambda
-        ].forEach(el => {
-            el.addEventListener('change', updateSettings);
+    // ===== 控制函数 =====
+    function doLogin() {
+        socket.emit('login', {
+            username: ui.user.value,
+            password: ui.pass.value
         });
+    }
 
-        // ===== 键盘控制 =====
-        document.addEventListener('keydown', e => {
-            // 如果在输入框打字，忽略
-            if (isInLobby || document.activeElement.tagName === 'INPUT') return;
+    function doRegister() {
+        socket.emit('register', {
+            username: ui.user.value,
+            password: ui.pass.value
+        });
+    }
 
-            // 禁止默认滚动 (方向键/空格)
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
-                e.preventDefault();
+    function joinGame() {
+        const nickname = ui.nickname.value.trim();
+        socket.emit('join', { nickname });
+    }
+
+    function toggleReady() {
+        socket.emit('toggle_ready');
+    }
+
+    function hostRestart() {
+        if (confirm('重置房间并清空游戏状态？')) {
+            socket.emit('host_restart');
+        }
+    }
+
+    function kickPlayer(i) {
+        if (confirm('确认踢出该玩家？')) {
+            socket.emit('host_kick', i);
+        }
+    }
+
+    function updateSettings() {
+        if (!isHost) return;
+
+        const numOr = (v, def) => {
+            const x = Number(v);
+            return Number.isFinite(x) ? x : def;
+        };
+
+        socket.emit('host_update_settings', {
+            speed: numOr(ui.sSpeed.value, 0.5),
+            mapType: ui.sMap.value,
+            gameMode: ui.sRule.value,
+            minDist: numOr(ui.sDist.value, 16),
+            captureThreshold: numOr(ui.sCapThr.value, 0),
+            oceanRatio: numOr(ui.sOceanRatio.value, 0.15),
+            portalCount: numOr(ui.sPortals.value, 2),
+            bloodMoonTurn: numOr(ui.sBloodTurn.value, 200),
+            growthMode: ui.sGrowthMode.value,
+            growthPeriod: numOr(ui.sGrowthPeriod.value, 25),
+            growthLambda: numOr(ui.sGrowthLambda.value, 1),
+            mapWidth: numOr(ui.sMapWidth.value, 20),
+            mapHeight: numOr(ui.sMapHeight.value, 20)
+        });
+    }
+
+    // 所有设置项变化都触发 updateSettings
+    [
+        ui.sSpeed, ui.sMap, ui.sRule, ui.sDist,
+        ui.sCapThr, ui.sOceanRatio, ui.sPortals,
+        ui.sBloodTurn, ui.sGrowthMode, ui.sGrowthPeriod, ui.sGrowthLambda,
+        ui.sMapWidth, ui.sMapHeight
+    ].forEach(el => {
+        el.addEventListener('change', updateSettings);
+    });
+
+    // ===== 键盘控制 =====
+    document.addEventListener('keydown', e => {
+        // 如果在输入框打字，忽略
+        if (isInLobby || document.activeElement.tagName === 'INPUT') return;
+
+        // 禁止默认滚动 (方向键/空格)
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+            e.preventDefault();
+        }
+
+        // --- 状态键逻辑 ---
+
+        // 左Shift: 分兵
+        if (e.key === 'Shift') isHalf = true;
+        // Ctrl: 加速
+        if (e.key === 'Control') isCtrl = true;
+
+        // CapsLock: 切换旁观/指挥模式
+        if (e.code === 'CapsLock') {
+            isSpectator = !isSpectator; // 切换状态
+            return;
+        }
+
+        // --- 功能键逻辑 ---
+
+        // 空格：回到将军
+        if (e.code === 'Space') {
+            if (myGeneralIndex !== -1) {
+                moveCursorTo(myGeneralIndex % MAP_W, Math.floor(myGeneralIndex / MAP_W));
+            } else {
+                showToast('未找到将军', 'error');
             }
+            return;
+        }
 
-            // --- 状态键逻辑 ---
+        // 设置快捷键 (Alt+Num) 或 跳转 (Num)
+        if (e.key >= '0' && e.key <= '9') {
+            const num = e.key;
+            if (e.altKey) {
+                // Alt + 数字：设置当前位置为快捷键
+                if (selected.x !== -1) {
+                    const idx = selected.y * MAP_W + selected.x;
 
-            // 左Shift: 分兵
-            if (e.key === 'Shift') isHalf = true;
-            // Ctrl: 加速
-            if (e.key === 'Control') isCtrl = true;
-
-            // CapsLock: 切换旁观/指挥模式
-            if (e.code === 'CapsLock') {
-                isSpectator = !isSpectator; // 切换状态
-                return;
-            }
-
-            // --- 功能键逻辑 ---
-
-            // 空格：回到将军
-            if (e.code === 'Space') {
-                if (myGeneralIndex !== -1) {
-                    moveCursorTo(myGeneralIndex % MAP_W, Math.floor(myGeneralIndex / MAP_W));
-                } else {
-                    showToast('未找到将军', 'error');
-                }
-                return;
-            }
-
-            // 设置快捷键 (Alt+Num) 或 跳转 (Num)
-            if (e.key >= '0' && e.key <= '9') {
-                const num = e.key;
-                if (e.altKey) {
-                    // Alt + 数字：设置当前位置为快捷键
-                    if (selected.x !== -1) {
-                        const idx = selected.y * MAP_W + selected.x;
-                        
-                        // 清除该数字之前的绑定
-                        if (shortcuts.has(num)) {
-                            const oldIdx = shortcuts.get(num);
-                            shortcuts.delete(num); // 删除绑定
-                            renderCell(oldIdx);    // 重绘旧格子
-                        }
-
-                        shortcuts.set(num, idx);
-                        renderCell(idx); // 刷新显示数字
-                        showToast(`位置已绑定到按键 ${num}`);
-                    }
-                } else {
-                    // 单按数字：跳转
+                    // 清除该数字之前的绑定
                     if (shortcuts.has(num)) {
-                        const idx = shortcuts.get(num);
-                        moveCursorTo(idx % MAP_W, Math.floor(idx / MAP_W));
+                        const oldIdx = shortcuts.get(num);
+                        shortcuts.delete(num); // 删除绑定
+                        renderCell(oldIdx);    // 重绘旧格子
                     }
+
+                    shortcuts.set(num, idx);
+                    renderCell(idx); // 刷新显示数字
+                    showToast(`位置已绑定到按键 ${num}`);
                 }
-                return;
-            }
-
-            // C. 方向键移动
-            const dirs = {
-                'w': 'up', 'ArrowUp': 'up',
-                's': 'down', 'ArrowDown': 'down',
-                'a': 'left', 'ArrowLeft': 'left',
-                'd': 'right', 'ArrowRight': 'right'
-            };
-            const d = dirs[e.key];
-
-            if (d && selected.x !== -1) {
-
-                // 保险: 物理状态上没按Shift, 重置状态
-                if (!e.shiftKey) isHalf = false;
-
-                // 计算步长：ctrl按住走3格，否则走1格
-                const step = isCtrl ? 3 : 1;
-                
-                let nx = selected.x;
-                let ny = selected.y;
-
-                if (d === 'left') nx -= step;
-                if (d === 'right') nx += step;
-                if (d === 'up') ny -= step;
-                if (d === 'down') ny += step;
-
-                // 边界限制 (Clamp)
-                nx = Math.max(0, Math.min(MAP_W - 1, nx));
-                ny = Math.max(0, Math.min(MAP_H - 1, ny));
-
-                // 逻辑分支
-                if (step > 1 || isSpectator) {
-                    // 1. 如果加速或旁观，只移动光标
-                    moveCursorTo(nx, ny);
-                } else {
-                    // 2. 普通模式：移动光标 + 发送指令
-                    // 注意：普通模式不支持一次跨3格发指令
-                    // 所以如果没按特殊键，步长肯定是1，正常发包
-                    
-                    const fromPos = { x: selected.x, y: selected.y };
-                    const toPos = { x: nx, y: ny };
-
-                    // 先动光标
-                    moveCursorTo(nx, ny);
-
-                    // 发送指令 (仅当距离为1时，或者是你以后想做寻路)
-                    // 目前服务端限制了距离必须为1，所以 step>1 的时候不能发包，只动光标
-                    if (step === 1) {
-                        socket.emit('command_move', {
-                            from: fromPos,
-                            to: toPos,
-                            half: isHalf // 此时 isHalf 由 ShiftLeft 控制
-                        });
-
-                        // 本地预测
-                        try {
-                            if (typeof predictLocalMove === 'function') {
-                                predictLocalMove(fromPos, toPos, isHalf);
-                            }
-                        } catch (err) { console.warn(err); }
-                    }
+            } else {
+                // 单按数字：跳转
+                if (shortcuts.has(num)) {
+                    const idx = shortcuts.get(num);
+                    moveCursorTo(idx % MAP_W, Math.floor(idx / MAP_W));
                 }
             }
-        });
+            return;
+        }
 
-        document.addEventListener('keyup', e => {
-            if (e.key === 'Shift') isHalf = false;
-            if (e.key === 'Control') isCtrl = false;
-        });
+        // C. 方向键移动
+        const dirs = {
+            'w': 'up', 'ArrowUp': 'up',
+            's': 'down', 'ArrowDown': 'down',
+            'a': 'left', 'ArrowLeft': 'left',
+            'd': 'right', 'ArrowRight': 'right'
+        };
+        const d = dirs[e.key];
 
-        // 辅助函数：移动光标并刷新 UI
-        function moveCursorTo(x, y) {
-            const oldX = selected.x;
-            const oldY = selected.y;
-            
-            // 刷新旧格子 (去高亮)
-            if (oldX !== -1 && oldY !== -1) {
-                const oldIdx = oldY * MAP_W + oldX;
-                if (cellState[oldIdx]) {
-                    cellState[oldIdx].sel = false;
-                    renderCell(oldIdx);
+        if (d && selected.x !== -1) {
+
+            // 保险: 物理状态上没按Shift, 重置状态
+            if (!e.shiftKey) isHalf = false;
+
+            // 计算步长：ctrl按住走3格，否则走1格
+            const step = isCtrl ? 3 : 1;
+
+            let nx = selected.x;
+            let ny = selected.y;
+
+            if (d === 'left') nx -= step;
+            if (d === 'right') nx += step;
+            if (d === 'up') ny -= step;
+            if (d === 'down') ny += step;
+
+            // 边界限制 (Clamp)
+            nx = Math.max(0, Math.min(MAP_W - 1, nx));
+            ny = Math.max(0, Math.min(MAP_H - 1, ny));
+
+            // 逻辑分支
+            if (step > 1 || isSpectator) {
+                // 1. 如果加速或旁观，只移动光标
+                moveCursorTo(nx, ny);
+            } else {
+                // 2. 普通模式：移动光标 + 发送指令
+                // 注意：普通模式不支持一次跨3格发指令
+                // 所以如果没按特殊键，步长肯定是1，正常发包
+
+                const fromPos = { x: selected.x, y: selected.y };
+                const toPos = { x: nx, y: ny };
+
+                // 先动光标
+                moveCursorTo(nx, ny);
+
+                // 发送指令 (仅当距离为1时，或者是你以后想做寻路)
+                // 目前服务端限制了距离必须为1，所以 step>1 的时候不能发包，只动光标
+                if (step === 1) {
+                    socket.emit('command_move', {
+                        from: fromPos,
+                        to: toPos,
+                        half: isHalf // 此时 isHalf 由 ShiftLeft 控制
+                    });
+
+                    // 本地预测
+                    try {
+                        if (typeof predictLocalMove === 'function') {
+                            predictLocalMove(fromPos, toPos, isHalf);
+                        }
+                    } catch (err) { console.warn(err); }
                 }
-            }
-
-            // 更新坐标
-            selected = { x, y };
-
-            // 刷新新格子 (加高亮)
-            const newIdx = y * MAP_W + x;
-            if (cellState[newIdx]) {
-                cellState[newIdx].sel = true;
-                renderCell(newIdx);
             }
         }
-    </script>
+    });
+
+    document.addEventListener('keyup', e => {
+        if (e.key === 'Shift') isHalf = false;
+        if (e.key === 'Control') isCtrl = false;
+    });
+
+    // 辅助函数：移动光标并刷新 UI
+    function moveCursorTo(x, y) {
+        const oldX = selected.x;
+        const oldY = selected.y;
+
+        // 刷新旧格子 (去高亮)
+        if (oldX !== -1 && oldY !== -1) {
+            const oldIdx = oldY * MAP_W + oldX;
+            if (cellState[oldIdx]) {
+                cellState[oldIdx].sel = false;
+                renderCell(oldIdx);
+            }
+        }
+
+        // 更新坐标
+        selected = { x, y };
+
+        // 刷新新格子 (加高亮)
+        const newIdx = y * MAP_W + x;
+        if (cellState[newIdx]) {
+            cellState[newIdx].sel = true;
+            renderCell(newIdx);
+        }
+    }
+</script>
 </body>
 </html>
