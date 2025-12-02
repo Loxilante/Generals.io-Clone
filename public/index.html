@@ -280,9 +280,9 @@
         portalCenter: '#ce93d8',
         portalOuter: '#12005e',
         portalSymbol: '#f3e5f5',
-        // 迷雾中的建筑颜色
+        // 迷雾中的建筑颜色（统一样式）
         fogCity: '#555',
-        fogMountain: '#333',
+        fogMountain: '#2f2f2f',
         fogWall: '#3e2723',
         fogTower: '#455a64',
         fogPortal: '#311b92',
@@ -606,11 +606,11 @@
         if (isInLobby) return;
 
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-
-        const clickX = (e.clientX - rect.left) * scaleX;
-        const clickY = (e.clientY - rect.top) * scaleY;
+        
+        // 直接使用 CSS 坐标（逻辑像素），无需考虑 devicePixelRatio
+        // 因为 rect.width/height 是 CSS 尺寸，cellSize 也是逻辑尺寸
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
 
         // 计算点击的格子坐标
         const x = Math.floor(clickX / (cellSize + 1));
