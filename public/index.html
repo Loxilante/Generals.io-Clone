@@ -411,16 +411,21 @@
                 ctx.fill();
             }
 
-            // 将军：金色边框 + 星星
+            // 将军：金色边框 + 星星（轻微白色描边 + 亮黄填充）
             if (type === 'general') {
                 ctx.strokeStyle = COLORS.generalBorder;
                 ctx.lineWidth = 2;
                 ctx.strokeRect(1, 1, cellSize - 2, cellSize - 2);
-                // 星星
-                ctx.fillStyle = COLORS.generalBorder;
+                // 星星（轻微白色描边 + 亮黄填充，确保在任何背景上都清晰可见）
                 ctx.font = `${cellSize * 0.5}px sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
+                // 先画白色描边
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.strokeText('★', cellSize / 2, cellSize / 2);
+                // 再画亮黄色填充
+                ctx.fillStyle = '#ffff00';
                 ctx.fillText('★', cellSize / 2, cellSize / 2);
             }
 
@@ -442,13 +447,13 @@
                 ctx.setLineDash([]);
             }
 
-            // 瞭望塔：^ 符号
+            // 瞭望塔：^ 符号（右上角显示）
             if (type === 'tower') {
-                ctx.fillStyle = 'rgba(255,255,255,0.8)';
-                ctx.font = `${cellSize * 0.4}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('^', cellSize / 2, cellSize / 2);
+                ctx.font = `bold ${cellSize * 0.35}px sans-serif`;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'top';
+                ctx.fillStyle = '#fff';
+                ctx.fillText('^', cellSize - 2, 1);
             }
 
             // 传送门：圆环
